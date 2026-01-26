@@ -1,1 +1,6 @@
 /target
+**/*.rs.bk
+.codex/
+.opencode/
+.agent/
+.DS_Store

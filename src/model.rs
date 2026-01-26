@@ -31,6 +31,7 @@ pub struct PluginEntry {
     pub source: PluginSource,
     pub description: Option<String>,
     pub version: Option<String>,
+    pub repository: Option<String>,
     // There are many other optional fields, we can add them as needed or use flattened HashMap for extras
     // For version comparison, 'version' is key.
     #[serde(flatten)]

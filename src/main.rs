@@ -248,47 +248,7 @@ fn install_plugin(plugin: &model::PluginEntry, dest: &Path, marketplace_repo: &s
     //    If `source` is a Path, AND `repository` field is present, use the `repository` URL as the clone target, and the path as relative to that.
     //
     //    Let's try that logic.
-
-    let (git_url, subpath, git_ref) = match &plugin.source {
-        PluginSource::Path(p) => {
-            // Prioritize `author.url` if present, then `repository` field, then fallback to marketplace_repo.
-            let repo_url = if let Some(author) = &plugin.author {
-                if let Some(url) = &author.url {
-                    if url.starts_with("http") || url.starts_with("git@") {
-                        url.clone()
-                    } else {
-                        format!("https://github.com/{}.git", url)
-                    }
-                } else if let Some(repo) = &plugin.repository {
-                    if repo.starts_with("http") || repo.starts_with("git@") {
-                        repo.clone()
-                    } else {
-                        format!("https://github.com/{}.git", repo)
-                    }
-                } else {
-                    format!("https://github.com/{}.git", marketplace_repo)
-                }
-            } else if let Some(repo) = &plugin.repository {
-                if repo.starts_with("http") || repo.starts_with("git@") {
-                    repo.clone()
-                } else {
-                    format!("https://github.com/{}.git", repo)
-                }
-            } else {
-                format!("https://github.com/{}.git", marketplace_repo)
-            };
-
-            (repo_url, Some(p.clone()), None)
-        }
-        PluginSource::Object(def) => match def {
-            SourceDefinition::Github { repo, ref_, sha: _ } => (
-                format!("https://github.com/{}.git", repo),
-                None,
-                ref_.clone(),
-            ),
-            SourceDefinition::Url { url, ref_, sha: _ } => (url.clone(), None, ref_.clone()),
-        },
-    };
+    let (git_url, subpath, git_ref) = resolve_plugin_url(plugin, marketplace_repo);
 
     info!("Cloning {} ...", git_url);
 
@@ -327,6 +287,59 @@ fn install_plugin(plugin: &model::PluginEntry, dest: &Path, marketplace_repo: &s
     Ok(())
 }
 
+fn resolve_plugin_url(
+    plugin: &model::PluginEntry,
+    marketplace_repo: &str,
+) -> (String, Option<String>, Option<String>) {
+    // Helper to resolve override URL from author.url or repository
+    let get_override_url = |plugin: &model::PluginEntry| -> Option<String> {
+        if let Some(author) = &plugin.author {
+            if let Some(url) = &author.url {
+                if url.starts_with("http") || url.starts_with("git@") {
+                    return Some(url.clone());
+                } else {
+                    return Some(format!("https://github.com/{}.git", url));
+                }
+            }
+        }
+        if let Some(repo) = &plugin.repository {
+            if repo.starts_with("http") || repo.starts_with("git@") {
+                return Some(repo.clone());
+            } else {
+                return Some(format!("https://github.com/{}.git", repo));
+            }
+        }
+        None
+    };
+
+    match &plugin.source {
+        PluginSource::Path(p) => {
+            let repo_url = get_override_url(plugin)
+                .unwrap_or_else(|| format!("https://github.com/{}.git", marketplace_repo));
+
+            (repo_url, Some(p.clone()), None)
+        }
+        PluginSource::Object(def) => match def {
+            SourceDefinition::Github {
+                repo,
+                ref_,
+                sha: _,
+            } => {
+                // For explicit Github source, use the defined repo, ignoring overrides
+                (format!("https://github.com/{}.git", repo), None, ref_.clone())
+            }
+            SourceDefinition::Url {
+                url,
+                ref_,
+                sha: _,
+            } => {
+                // For explicit URL source, use the defined URL, ignoring overrides
+                (url.clone(), None, ref_.clone())
+            }
+        },
+    }
+}
+
 fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
@@ -347,4 +360,215 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{Author, PluginEntry, PluginSource, SourceDefinition};
+    use std::collections::HashMap;
+
+    fn create_dummy_plugin(
+        source: PluginSource,
+        author_url: Option<String>,
+        repository: Option<String>,
+    ) -> PluginEntry {
+        PluginEntry {
+            name: "test-plugin".to_string(),
+            source,
+            description: None,
+            version: None,
+            repository,
+            author: Some(Author {
+                name: Some("Test Author".to_string()),
+                email: None,
+                url: author_url,
+            }),
+            extra: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_resolve_path_defaults_to_marketplace() {
+        let source = PluginSource::Path("./skills/test".to_string());
+        let plugin = create_dummy_plugin(source, None, None);
+        let (url, subpath, _) = resolve_plugin_url(&plugin, "owner/marketplace");
+
+        assert_eq!(url, "https://github.com/owner/marketplace.git");
+        assert_eq!(subpath, Some("./skills/test".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_path_uses_author_url_override() {
+        let source = PluginSource::Path("./skills/test".to_string());
+        let plugin = create_dummy_plugin(source, Some("other/repo".to_string()), None);
+        let (url, subpath, _) = resolve_plugin_url(&plugin, "owner/marketplace");
+
+        assert_eq!(url, "https://github.com/other/repo.git");
+        assert_eq!(subpath, Some("./skills/test".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_path_uses_repository_override() {
+        let source = PluginSource::Path("./skills/test".to_string());
+        let plugin = create_dummy_plugin(
+            source,
+            None,
+            Some("https://github.com/repo/over".to_string()),
+        );
+        let (url, subpath, _) = resolve_plugin_url(&plugin, "owner/marketplace");
+
+        assert_eq!(url, "https://github.com/repo/over"); // Note: clone logic usually appends .git if missing in some tools, but here we just take it if http
+        assert_eq!(subpath, Some("./skills/test".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_github_object_ignores_override() {
+        let source = PluginSource::Object(SourceDefinition::Github {
+            repo: "original/repo".to_string(),
+            ref_: None,
+            sha: None,
+        });
+        // Override with author url - should be IGNORED for Github source object
+        let plugin = create_dummy_plugin(source, Some("override/repo".to_string()), None);
+        let (url, _, _) = resolve_plugin_url(&plugin, "owner/marketplace");
+
+        assert_eq!(url, "https://github.com/original/repo.git");
+    }
+
+    #[test]
+    fn test_resolve_github_object_defaults_to_source_repo() {
+        let source = PluginSource::Object(SourceDefinition::Github {
+            repo: "original/repo".to_string(),
+            ref_: None,
+            sha: None,
+        });
+        let plugin = create_dummy_plugin(source, None, None);
+        let (url, _, _) = resolve_plugin_url(&plugin, "owner/marketplace");
+
+        assert_eq!(url, "https://github.com/original/repo.git");
+    }
+}
+        PluginSource::Object(def) => match def {
+            SourceDefinition::Github { repo, ref_, sha: _ } => {
+                let repo_url = get_override_url(plugin)
+                    .unwrap_or_else(|| format!("https://github.com/{}.git", repo));
+                (repo_url, None, ref_.clone())
+            }
+            SourceDefinition::Url { url, ref_, sha: _ } => {
+                let repo_url = get_override_url(plugin).unwrap_or_else(|| url.clone());
+                (repo_url, None, ref_.clone())
+            }
+        },
+    }
+}
+
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let path = entry.path();
+        let name = entry.file_name();
+        let dst_path = dst.join(name);
+
+        if ty.is_dir() {
+            // Skip .git directory
+            if path.file_name().and_then(|s| s.to_str()) == Some(".git") {
+                continue;
+            }
+            copy_dir_all(&path, &dst_path)?;
+        } else {
+            fs::copy(path, dst_path)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{Author, PluginEntry, PluginSource, SourceDefinition};
+    use std::collections::HashMap;
+
+    fn create_dummy_plugin(
+        source: PluginSource,
+        author_url: Option<String>,
+        repository: Option<String>,
+    ) -> PluginEntry {
+        PluginEntry {
+            name: "test-plugin".to_string(),
+            source,
+            description: None,
+            version: None,
+            repository,
+            author: Some(Author {
+                name: Some("Test Author".to_string()),
+                email: None,
+                url: author_url,
+            }),
+            extra: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_resolve_path_defaults_to_marketplace() {
+        let source = PluginSource::Path("./skills/test".to_string());
+        let plugin = create_dummy_plugin(source, None, None);
+        let (url, subpath, _) = resolve_plugin_url(&plugin, "owner/marketplace");
+
+        assert_eq!(url, "https://github.com/owner/marketplace.git");
+        assert_eq!(subpath, Some("./skills/test".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_path_uses_author_url_override() {
+        let source = PluginSource::Path("./skills/test".to_string());
+        let plugin = create_dummy_plugin(source, Some("other/repo".to_string()), None);
+        let (url, subpath, _) = resolve_plugin_url(&plugin, "owner/marketplace");
+
+        assert_eq!(url, "https://github.com/other/repo.git");
+        assert_eq!(subpath, Some("./skills/test".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_path_uses_repository_override() {
+        let source = PluginSource::Path("./skills/test".to_string());
+        let plugin = create_dummy_plugin(
+            source,
+            None,
+            Some("https://github.com/repo/over".to_string()),
+        );
+        let (url, subpath, _) = resolve_plugin_url(&plugin, "owner/marketplace");
+
+        assert_eq!(url, "https://github.com/repo/over"); // Note: clone logic usually appends .git if missing in some tools, but here we just take it if http
+        assert_eq!(subpath, Some("./skills/test".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_github_object_uses_override() {
+        let source = PluginSource::Object(SourceDefinition::Github {
+            repo: "original/repo".to_string(),
+            ref_: None,
+            sha: None,
+        });
+        // Override with author url
+        let plugin = create_dummy_plugin(source, Some("override/repo".to_string()), None);
+        let (url, _, _) = resolve_plugin_url(&plugin, "owner/marketplace");
+
+        assert_eq!(url, "https://github.com/override/repo.git");
+    }
+
+    #[test]
+    fn test_resolve_github_object_defaults_to_source_repo() {
+        let source = PluginSource::Object(SourceDefinition::Github {
+            repo: "original/repo".to_string(),
+            ref_: None,
+            sha: None,
+        });
+        let plugin = create_dummy_plugin(source, None, None);
+        let (url, _, _) = resolve_plugin_url(&plugin, "owner/marketplace");
+
+        assert_eq!(url, "https://github.com/original/repo.git");
+    }
 }

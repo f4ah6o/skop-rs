@@ -2,31 +2,31 @@
 > Fetch the complete documentation index at: https://code.claude.com/docs/llms.txt
 > Use this file to discover all available pages before exploring further.
 
-# Create and distribute a plugin marketplace
+# プラグインマーケットプレイスの作成と配布
 
-> Build and host plugin marketplaces to distribute Claude Code extensions across teams and communities.
+> Claude Code拡張機能を配布するためのプラグインマーケットプレイスを構築およびホストします。
 
-A plugin marketplace is a catalog that lets you distribute plugins to others. Marketplaces provide centralized discovery, version tracking, automatic updates, and support for multiple source types (git repositories, local paths, and more). This guide shows you how to create your own marketplace to share plugins with your team or community.
+プラグインマーケットプレイスは、他のユーザーにプラグインを配布できるカタログです。マーケットプレイスは、一元化された検出、バージョン追跡、自動更新、および複数のソースタイプ（Gitリポジトリ、ローカルパスなど）のサポートを提供します。このガイドでは、チームやコミュニティとプラグインを共有するための独自のマーケットプレイスを作成する方法を説明します。
 
-Looking to install plugins from an existing marketplace? See [Discover and install prebuilt plugins](/en/discover-plugins).
+既存のマーケットプレイスからプラグインをインストールしたいですか？[既成プラグインの検出とインストール](/ja/discover-plugins)を参照してください。
 
-## Overview
+## 概要
 
-Creating and distributing a marketplace involves:
+マーケットプレイスの作成と配布には以下が含まれます：
 
-1. **Creating plugins**: build one or more plugins with commands, agents, hooks, MCP servers, or LSP servers. This guide assumes you already have plugins to distribute; see [Create plugins](/en/plugins) for details on how to create them.
-2. **Creating a marketplace file**: define a `marketplace.json` that lists your plugins and where to find them (see [Create the marketplace file](#create-the-marketplace-file)).
-3. **Host the marketplace**: push to GitHub, GitLab, or another git host (see [Host and distribute marketplaces](#host-and-distribute-marketplaces)).
-4. **Share with users**: users add your marketplace with `/plugin marketplace add` and install individual plugins (see [Discover and install plugins](/en/discover-plugins)).
+1. **プラグインの作成**：コマンド、エージェント、フック、MCPサーバー、またはLSPサーバーを使用して1つ以上のプラグインを構築します。このガイドでは、配布するプラグインが既にあることを前提としています。プラグインの作成方法の詳細については、[プラグインの作成](/ja/plugins)を参照してください。
+2. **マーケットプレイスファイルの作成**：プラグインとその場所をリストする`marketplace.json`を定義します（[マーケットプレイスファイルの作成](#create-the-marketplace-file)を参照）。
+3. **マーケットプレイスのホスト**：GitHub、GitLab、または別のGitホストにプッシュします（[マーケットプレイスのホストと配布](#host-and-distribute-marketplaces)を参照）。
+4. **ユーザーと共有**：ユーザーは`/plugin marketplace add`でマーケットプレイスを追加し、個別のプラグインをインストールします（[プラグインの検出とインストール](/ja/discover-plugins)を参照）。
 
-Once your marketplace is live, you can update it by pushing changes to your repository. Users refresh their local copy with `/plugin marketplace update`.
+マーケットプレイスがライブになったら、リポジトリに変更をプッシュして更新できます。ユーザーは`/plugin marketplace update`でローカルコピーを更新します。
 
-## Walkthrough: create a local marketplace
+## チュートリアル：ローカルマーケットプレイスの作成
 
-This example creates a marketplace with one plugin: a `/review` skill for code reviews. You'll create the directory structure, add a skill, create the plugin manifest and marketplace catalog, then install and test it.
+この例では、1つのプラグイン（コードレビュー用の`/review`スキル）を含むマーケットプレイスを作成します。ディレクトリ構造を作成し、スキルを追加し、プラグインマニフェストとマーケットプレイスカタログを作成してから、インストールしてテストします。
 
 <Steps>
-  <Step title="Create the directory structure">
+  <Step title="ディレクトリ構造の作成">
     ```bash  theme={null}
     mkdir -p my-marketplace/.claude-plugin
     mkdir -p my-marketplace/plugins/review-plugin/.claude-plugin
@@ -34,8 +34,8 @@ This example creates a marketplace with one plugin: a `/review` skill for code r
     ```
   </Step>
 
-  <Step title="Create the skill">
-    Create a `SKILL.md` file that defines what the `/review` skill does.
+  <Step title="スキルの作成">
+    `/review`スキルが何をするかを定義する`SKILL.md`ファイルを作成します。
 
     ```markdown my-marketplace/plugins/review-plugin/skills/review/SKILL.md theme={null}
     ---
@@ -53,8 +53,8 @@ This example creates a marketplace with one plugin: a `/review` skill for code r
     ```
   </Step>
 
-  <Step title="Create the plugin manifest">
-    Create a `plugin.json` file that describes the plugin. The manifest goes in the `.claude-plugin/` directory.
+  <Step title="プラグインマニフェストの作成">
+    プラグインを説明する`plugin.json`ファイルを作成します。マニフェストは`.claude-plugin/`ディレクトリに配置されます。
 
     ```json my-marketplace/plugins/review-plugin/.claude-plugin/plugin.json theme={null}
     {
@@ -65,8 +65,8 @@ This example creates a marketplace with one plugin: a `/review` skill for code r
     ```
   </Step>
 
-  <Step title="Create the marketplace file">
-    Create the marketplace catalog that lists your plugin.
+  <Step title="マーケットプレイスファイルの作成">
+    プラグインをリストするマーケットプレイスカタログを作成します。
 
     ```json my-marketplace/.claude-plugin/marketplace.json theme={null}
     {
@@ -85,8 +85,8 @@ This example creates a marketplace with one plugin: a `/review` skill for code r
     ```
   </Step>
 
-  <Step title="Add and install">
-    Add the marketplace and install the plugin.
+  <Step title="追加とインストール">
+    マーケットプレイスを追加してプラグインをインストールします。
 
     ```shell  theme={null}
     /plugin marketplace add ./my-marketplace
@@ -94,8 +94,8 @@ This example creates a marketplace with one plugin: a `/review` skill for code r
     ```
   </Step>
 
-  <Step title="Try it out">
-    Select some code in your editor and run your new command.
+  <Step title="試してみる">
+    エディタでコードを選択して、新しいコマンドを実行します。
 
     ```shell  theme={null}
     /review
@@ -103,19 +103,19 @@ This example creates a marketplace with one plugin: a `/review` skill for code r
   </Step>
 </Steps>
 
-To learn more about what plugins can do, including hooks, agents, MCP servers, and LSP servers, see [Plugins](/en/plugins).
+プラグインができることの詳細（フック、エージェント、MCPサーバー、LSPサーバーを含む）については、[プラグイン](/ja/plugins)を参照してください。
 
 <Note>
-  **How plugins are installed**: When users install a plugin, Claude Code copies the plugin directory to a cache location. This means plugins can't reference files outside their directory using paths like `../shared-utils`, because those files won't be copied.
+  **プラグインのインストール方法**：ユーザーがプラグインをインストールすると、Claude Codeはプラグインディレクトリをキャッシュロケーションにコピーします。これは、`../shared-utils`のようなパスを使用してプラグインディレクトリの外のファイルを参照できないことを意味します。これらのファイルはコピーされないためです。
 
-  If you need to share files across plugins, use symlinks (which are followed during copying) or restructure your marketplace so the shared directory is inside the plugin source path. See [Plugin caching and file resolution](/en/plugins-reference#plugin-caching-and-file-resolution) for details.
+  複数のプラグイン間でファイルを共有する必要がある場合は、シンボリックリンク（コピー中にフォローされる）を使用するか、マーケットプレイスを再構成して、共有ディレクトリがプラグインソースパス内にあるようにします。詳細については、[プラグインキャッシングとファイル解決](/ja/plugins-reference#plugin-caching-and-file-resolution)を参照してください。
 </Note>
 
-## Create the marketplace file
+## マーケットプレイスファイルの作成
 
-Create `.claude-plugin/marketplace.json` in your repository root. This file defines your marketplace's name, owner information, and a list of plugins with their sources.
+リポジトリルートに`.claude-plugin/marketplace.json`を作成します。このファイルは、マーケットプレイスの名前、所有者情報、およびソース付きプラグインのリストを定義します。
 
-Each plugin entry needs at minimum a `name` and `source` (where to fetch it from). See the [full schema](#marketplace-schema) below for all available fields.
+各プラグインエントリには、最低限`name`と`source`（取得元）が必要です。利用可能なすべてのフィールドについては、以下の[完全なスキーマ](#marketplace-schema)を参照してください。
 
 ```json  theme={null}
 {
@@ -146,78 +146,78 @@ Each plugin entry needs at minimum a `name` and `source` (where to fetch it from
 }
 ```
 
-## Marketplace schema
+## マーケットプレイススキーマ
 
-### Required fields
+### 必須フィールド
 
-| Field     | Type   | Description                                                                                                                                                            | Example        |
-| :-------- | :----- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------- |
-| `name`    | string | Marketplace identifier (kebab-case, no spaces). This is public-facing: users see it when installing plugins (for example, `/plugin install my-tool@your-marketplace`). | `"acme-tools"` |
-| `owner`   | object | Marketplace maintainer information ([see fields below](#owner-fields))                                                                                                 |                |
-| `plugins` | array  | List of available plugins                                                                                                                                              | See below      |
+| フィールド     | タイプ    | 説明                                                                                                                | 例              |
+| :-------- | :----- | :---------------------------------------------------------------------------------------------------------------- | :------------- |
+| `name`    | 文字列    | マーケットプレイス識別子（ケバブケース、スペースなし）。これは公開向けです：ユーザーはプラグインをインストールするときにこれを見ます（例：`/plugin install my-tool@your-marketplace`）。 | `"acme-tools"` |
+| `owner`   | オブジェクト | マーケットプレイスメンテナー情報（[以下のフィールドを参照](#owner-fields)）                                                                    |                |
+| `plugins` | 配列     | 利用可能なプラグインのリスト                                                                                                    | 以下を参照          |
 
 <Note>
-  **Reserved names**: The following marketplace names are reserved for official Anthropic use and cannot be used by third-party marketplaces: `claude-code-marketplace`, `claude-code-plugins`, `claude-plugins-official`, `anthropic-marketplace`, `anthropic-plugins`, `agent-skills`, `life-sciences`. Names that impersonate official marketplaces (like `official-claude-plugins` or `anthropic-tools-v2`) are also blocked.
+  **予約名**：以下のマーケットプレイス名はAnthropicの公式使用のために予約されており、サードパーティのマーケットプレイスでは使用できません：`claude-code-marketplace`、`claude-code-plugins`、`claude-plugins-official`、`anthropic-marketplace`、`anthropic-plugins`、`agent-skills`、`life-sciences`。公式マーケットプレイスになりすましている名前（`official-claude-plugins`や`anthropic-tools-v2`など）もブロックされています。
 </Note>
 
-### Owner fields
+### 所有者フィールド
 
-| Field   | Type   | Required | Description                      |
-| :------ | :----- | :------- | :------------------------------- |
-| `name`  | string | Yes      | Name of the maintainer or team   |
-| `email` | string | No       | Contact email for the maintainer |
+| フィールド   | タイプ | 必須  | 説明             |
+| :------ | :-- | :-- | :------------- |
+| `name`  | 文字列 | はい  | メンテナーまたはチームの名前 |
+| `email` | 文字列 | いいえ | メンテナーの連絡先メール   |
 
-### Optional metadata
+### オプションメタデータ
 
-| Field                  | Type   | Description                                                                                                                                                               |
-| :--------------------- | :----- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `metadata.description` | string | Brief marketplace description                                                                                                                                             |
-| `metadata.version`     | string | Marketplace version                                                                                                                                                       |
-| `metadata.pluginRoot`  | string | Base directory prepended to relative plugin source paths (for example, `"./plugins"` lets you write `"source": "formatter"` instead of `"source": "./plugins/formatter"`) |
+| フィールド                  | タイプ | 説明                                                                                                                           |
+| :--------------------- | :-- | :--------------------------------------------------------------------------------------------------------------------------- |
+| `metadata.description` | 文字列 | マーケットプレイスの簡潔な説明                                                                                                              |
+| `metadata.version`     | 文字列 | マーケットプレイスバージョン                                                                                                               |
+| `metadata.pluginRoot`  | 文字列 | 相対プラグインソースパスの前に付加されるベースディレクトリ（例：`"./plugins"`を使用すると、`"source": "./plugins/formatter"`の代わりに`"source": "formatter"`と書くことができます） |
 
-## Plugin entries
+## プラグインエントリ
 
-Each plugin entry in the `plugins` array describes a plugin and where to find it. You can include any field from the [plugin manifest schema](/en/plugins-reference#plugin-manifest-schema) (like `description`, `version`, `author`, `commands`, `hooks`, etc.), plus these marketplace-specific fields: `source`, `category`, `tags`, and `strict`.
+`plugins`配列内の各プラグインエントリは、プラグインとその場所を説明します。[プラグインマニフェストスキーマ](/ja/plugins-reference#plugin-manifest-schema)の任意のフィールド（`description`、`version`、`author`、`commands`、`hooks`など）を含めることができます。また、これらのマーケットプレイス固有のフィールド：`source`、`category`、`tags`、および`strict`も含めることができます。
 
-### Required fields
+### 必須フィールド
 
-| Field    | Type           | Description                                                                                                                                            |
-| :------- | :------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`   | string         | Plugin identifier (kebab-case, no spaces). This is public-facing: users see it when installing (for example, `/plugin install my-plugin@marketplace`). |
-| `source` | string\|object | Where to fetch the plugin from (see [Plugin sources](#plugin-sources) below)                                                                           |
+| フィールド    | タイプ         | 説明                                                                                                |
+| :------- | :---------- | :------------------------------------------------------------------------------------------------ |
+| `name`   | 文字列         | プラグイン識別子（ケバブケース、スペースなし）。これは公開向けです：ユーザーはインストール時にこれを見ます（例：`/plugin install my-plugin@marketplace`）。 |
+| `source` | 文字列\|オブジェクト | プラグインを取得する場所（以下の[プラグインソース](#plugin-sources)を参照）                                                   |
 
-### Optional plugin fields
+### オプションプラグインフィールド
 
-**Standard metadata fields:**
+**標準メタデータフィールド：**
 
-| Field         | Type    | Description                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| :------------ | :------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `description` | string  | Brief plugin description                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `version`     | string  | Plugin version                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `author`      | object  | Plugin author information (`name` required, `email` optional)                                                                                                                                                                                                                                                                                                                                                                    |
-| `homepage`    | string  | Plugin homepage or documentation URL                                                                                                                                                                                                                                                                                                                                                                                             |
-| `repository`  | string  | Source code repository URL                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `license`     | string  | SPDX license identifier (for example, MIT, Apache-2.0)                                                                                                                                                                                                                                                                                                                                                                           |
-| `keywords`    | array   | Tags for plugin discovery and categorization                                                                                                                                                                                                                                                                                                                                                                                     |
-| `category`    | string  | Plugin category for organization                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `tags`        | array   | Tags for searchability                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `strict`      | boolean | Controls whether plugins need their own `plugin.json` file. When `true` (default), the plugin source must contain a `plugin.json`, and any fields you add here in the marketplace entry get merged with it. When `false`, the plugin doesn't need its own `plugin.json`; the marketplace entry itself defines everything about the plugin. Use `false` when you want to define simple plugins entirely in your marketplace file. |
+| フィールド         | タイプ    | 説明                                                                                                                                                                                                                                                                 |
+| :------------ | :----- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `description` | 文字列    | プラグインの簡潔な説明                                                                                                                                                                                                                                                        |
+| `version`     | 文字列    | プラグインバージョン                                                                                                                                                                                                                                                         |
+| `author`      | オブジェクト | プラグイン作成者情報（`name`は必須、`email`はオプション）                                                                                                                                                                                                                                |
+| `homepage`    | 文字列    | プラグインホームページまたはドキュメンテーションURL                                                                                                                                                                                                                                        |
+| `repository`  | 文字列    | ソースコードリポジトリURL                                                                                                                                                                                                                                                     |
+| `license`     | 文字列    | SPDXライセンス識別子（例：MIT、Apache-2.0）                                                                                                                                                                                                                                     |
+| `keywords`    | 配列     | プラグイン検出とカテゴリ化用のタグ                                                                                                                                                                                                                                                  |
+| `category`    | 文字列    | 組織用のプラグインカテゴリ                                                                                                                                                                                                                                                      |
+| `tags`        | 配列     | 検索可能性用のタグ                                                                                                                                                                                                                                                          |
+| `strict`      | ブール値   | プラグインが独自の`plugin.json`ファイルを必要とするかどうかを制御します。`true`（デフォルト）の場合、プラグインソースは`plugin.json`を含む必要があり、ここのマーケットプレイスエントリに追加したフィールドはそれとマージされます。`false`の場合、プラグインは独自の`plugin.json`を必要としません。マーケットプレイスエントリ自体がプラグインについてのすべてを定義します。マーケットプレイスファイル内で完全にシンプルなプラグインを定義したい場合は`false`を使用します。 |
 
-**Component configuration fields:**
+**コンポーネント設定フィールド：**
 
-| Field        | Type           | Description                                      |
-| :----------- | :------------- | :----------------------------------------------- |
-| `commands`   | string\|array  | Custom paths to command files or directories     |
-| `agents`     | string\|array  | Custom paths to agent files                      |
-| `hooks`      | string\|object | Custom hooks configuration or path to hooks file |
-| `mcpServers` | string\|object | MCP server configurations or path to MCP config  |
-| `lspServers` | string\|object | LSP server configurations or path to LSP config  |
+| フィールド        | タイプ         | 説明                        |
+| :----------- | :---------- | :------------------------ |
+| `commands`   | 文字列\|配列     | コマンドファイルまたはディレクトリへのカスタムパス |
+| `agents`     | 文字列\|配列     | エージェントファイルへのカスタムパス        |
+| `hooks`      | 文字列\|オブジェクト | カスタムフック設定またはフックファイルへのパス   |
+| `mcpServers` | 文字列\|オブジェクト | MCPサーバー設定またはMCP設定ファイルへのパス |
+| `lspServers` | 文字列\|オブジェクト | LSPサーバー設定またはLSP設定ファイルへのパス |
 
-## Plugin sources
+## プラグインソース
 
-### Relative paths
+### 相対パス
 
-For plugins in the same repository:
+同じリポジトリ内のプラグインの場合：
 
 ```json  theme={null}
 {
@@ -227,10 +227,10 @@ For plugins in the same repository:
 ```
 
 <Note>
-  Relative paths only work when users add your marketplace via Git (GitHub, GitLab, or git URL). If users add your marketplace via a direct URL to the `marketplace.json` file, relative paths will not resolve correctly. For URL-based distribution, use GitHub, npm, or git URL sources instead. See [Troubleshooting](#plugins-with-relative-paths-fail-in-url-based-marketplaces) for details.
+  相対パスは、ユーザーがGit（GitHub、GitLab、またはGit URL）経由でマーケットプレイスを追加する場合にのみ機能します。ユーザーが`marketplace.json`ファイルへの直接URLを介してマーケットプレイスを追加する場合、相対パスは正しく解決されません。URLベースの配布の場合は、GitHub、npm、またはGit URLソースを代わりに使用してください。詳細については、[トラブルシューティング](#plugins-with-relative-paths-fail-in-url-based-marketplaces)を参照してください。
 </Note>
 
-### GitHub repositories
+### GitHubリポジトリ
 
 ```json  theme={null}
 {
@@ -242,27 +242,7 @@ For plugins in the same repository:
 }
 ```
 
-You can pin to a specific branch, tag, or commit:
-
-```json  theme={null}
-{
-  "name": "github-plugin",
-  "source": {
-    "source": "github",
-    "repo": "owner/plugin-repo",
-    "ref": "v2.0.0",
-    "sha": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
-  }
-}
-```
-
-| Field  | Type   | Description                                                           |
-| :----- | :----- | :-------------------------------------------------------------------- |
-| `repo` | string | Required. GitHub repository in `owner/repo` format                    |
-| `ref`  | string | Optional. Git branch or tag (defaults to repository default branch)   |
-| `sha`  | string | Optional. Full 40-character git commit SHA to pin to an exact version |
-
-### Git repositories
+### Gitリポジトリ
 
 ```json  theme={null}
 {
@@ -274,29 +254,9 @@ You can pin to a specific branch, tag, or commit:
 }
 ```
 
-You can pin to a specific branch, tag, or commit:
+### 高度なプラグインエントリ
 
-```json  theme={null}
-{
-  "name": "git-plugin",
-  "source": {
-    "source": "url",
-    "url": "https://gitlab.com/team/plugin.git",
-    "ref": "main",
-    "sha": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
-  }
-}
-```
-
-| Field | Type   | Description                                                           |
-| :---- | :----- | :-------------------------------------------------------------------- |
-| `url` | string | Required. Full git repository URL (must end with `.git`)              |
-| `ref` | string | Optional. Git branch or tag (defaults to repository default branch)   |
-| `sha` | string | Optional. Full 40-character git commit SHA to pin to an exact version |
-
-### Advanced plugin entries
-
-This example shows a plugin entry using many of the optional fields, including custom paths for commands, agents, hooks, and MCP servers:
+この例は、コマンド、エージェント、フック、MCPサーバーのカスタムパスを含む、多くのオプションフィールドを使用するプラグインエントリを示しています：
 
 ```json  theme={null}
 {
@@ -345,68 +305,68 @@ This example shows a plugin entry using many of the optional fields, including c
 }
 ```
 
-Key things to notice:
+注意すべき重要な点：
 
-* **`commands` and `agents`**: You can specify multiple directories or individual files. Paths are relative to the plugin root.
-* **`${CLAUDE_PLUGIN_ROOT}`**: Use this variable in hooks and MCP server configs to reference files within the plugin's installation directory. This is necessary because plugins are copied to a cache location when installed.
-* **`strict: false`**: Since this is set to false, the plugin doesn't need its own `plugin.json`. The marketplace entry defines everything.
+* **`commands`と`agents`**：複数のディレクトリまたは個別のファイルを指定できます。パスはプラグインルートに相対的です。
+* **`${CLAUDE_PLUGIN_ROOT}`**：フックとMCPサーバー設定でこの変数を使用して、プラグインのインストールディレクトリ内のファイルを参照します。これは、プラグインがインストール時にキャッシュロケーションにコピーされるため必要です。
+* **`strict: false`**：これが`false`に設定されているため、プラグインは独自の`plugin.json`を必要としません。マーケットプレイスエントリがすべてを定義します。
 
-## Host and distribute marketplaces
+## マーケットプレイスのホストと配布
 
-### Host on GitHub (recommended)
+### GitHubでホスト（推奨）
 
-GitHub provides the easiest distribution method:
+GitHubは最も簡単な配布方法を提供します：
 
-1. **Create a repository**: Set up a new repository for your marketplace
-2. **Add marketplace file**: Create `.claude-plugin/marketplace.json` with your plugin definitions
-3. **Share with teams**: Users add your marketplace with `/plugin marketplace add owner/repo`
+1. **リポジトリの作成**：マーケットプレイス用の新しいリポジトリを設定します
+2. **マーケットプレイスファイルの追加**：プラグイン定義を含む`.claude-plugin/marketplace.json`を作成します
+3. **チームと共有**：ユーザーは`/plugin marketplace add owner/repo`でマーケットプレイスを追加します
 
-**Benefits**: Built-in version control, issue tracking, and team collaboration features.
+**メリット**：組み込みのバージョン管理、問題追跡、チームコラボレーション機能。
 
-### Host on other git services
+### 他のGitサービスでホスト
 
-Any git hosting service works, such as GitLab, Bitbucket, and self-hosted servers. Users add with the full repository URL:
+GitLab、Bitbucket、自己ホスト型サーバーなど、任意のGitホスティングサービスが機能します。ユーザーは完全なリポジトリURLで追加します：
 
 ```shell  theme={null}
 /plugin marketplace add https://gitlab.com/company/plugins.git
 ```
 
-### Private repositories
+### プライベートリポジトリ
 
-Claude Code supports installing plugins from private repositories. Set the appropriate authentication token in your environment, and Claude Code will use it when authentication is required.
+Claude Codeはプライベートリポジトリからプラグインをインストールすることをサポートしています。環境で適切な認証トークンを設定すると、Claude Codeは認証が必要な場合にそれを使用します。
 
-| Provider  | Environment variables        | Notes                                     |
-| :-------- | :--------------------------- | :---------------------------------------- |
-| GitHub    | `GITHUB_TOKEN` or `GH_TOKEN` | Personal access token or GitHub App token |
-| GitLab    | `GITLAB_TOKEN` or `GL_TOKEN` | Personal access token or project token    |
-| Bitbucket | `BITBUCKET_TOKEN`            | App password or repository access token   |
+| プロバイダー    | 環境変数                        | 注記                          |
+| :-------- | :-------------------------- | :-------------------------- |
+| GitHub    | `GITHUB_TOKEN`または`GH_TOKEN` | 個人アクセストークンまたはGitHub Appトークン |
+| GitLab    | `GITLAB_TOKEN`または`GL_TOKEN` | 個人アクセストークンまたはプロジェクトトークン     |
+| Bitbucket | `BITBUCKET_TOKEN`           | アプリパスワードまたはリポジトリアクセストークン    |
 
-Set the token in your shell configuration (for example, `.bashrc`, `.zshrc`) or pass it when running Claude Code:
+シェル設定（例：`.bashrc`、`.zshrc`）でトークンを設定するか、Claude Codeを実行するときに渡します：
 
 ```bash  theme={null}
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 ```
 
-Authentication tokens are only used when a repository requires authentication. Public repositories work without any tokens configured, even if tokens are present in your environment.
+認証トークンは、リポジトリが認証を必要とする場合にのみ使用されます。公開リポジトリは、環境に存在するトークンがあっても、トークンなしで機能します。
 
 <Note>
-  For CI/CD environments, configure the token as a secret environment variable. GitHub Actions automatically provides `GITHUB_TOKEN` for repositories in the same organization.
+  CI/CD環境の場合、トークンをシークレット環境変数として設定します。GitHub Actionsは同じ組織内のリポジトリに対して自動的に`GITHUB_TOKEN`を提供します。
 </Note>
 
-### Test locally before distribution
+### 配布前にローカルでテスト
 
-Test your marketplace locally before sharing:
+共有する前にマーケットプレイスをローカルでテストします：
 
 ```shell  theme={null}
 /plugin marketplace add ./my-local-marketplace
 /plugin install test-plugin@my-local-marketplace
 ```
 
-For the full range of add commands (GitHub, Git URLs, local paths, remote URLs), see [Add marketplaces](/en/discover-plugins#add-marketplaces).
+追加コマンドの完全な範囲（GitHub、Git URL、ローカルパス、リモートURL）については、[マーケットプレイスの追加](/ja/discover-plugins#add-marketplaces)を参照してください。
 
-### Require marketplaces for your team
+### チームのマーケットプレイスを必須にする
 
-You can configure your repository so team members are automatically prompted to install your marketplace when they trust the project folder. Add your marketplace to `.claude/settings.json`:
+プロジェクトフォルダを信頼するときにチームメンバーが自動的にマーケットプレイスをインストールするよう促されるようにリポジトリを設定できます。マーケットプレイスを`.claude/settings.json`に追加します：
 
 ```json  theme={null}
 {
@@ -421,7 +381,7 @@ You can configure your repository so team members are automatically prompted to 
 }
 ```
 
-You can also specify which plugins should be enabled by default:
+デフォルトで有効にするプラグインを指定することもできます：
 
 ```json  theme={null}
 {
@@ -432,23 +392,23 @@ You can also specify which plugins should be enabled by default:
 }
 ```
 
-For full configuration options, see [Plugin settings](/en/settings#plugin-settings).
+完全な設定オプションについては、[プラグイン設定](/ja/settings#plugin-settings)を参照してください。
 
-### Managed marketplace restrictions
+### マネージドマーケットプレイスの制限
 
-For organizations requiring strict control over plugin sources, administrators can restrict which plugin marketplaces users are allowed to add using the [`strictKnownMarketplaces`](/en/settings#strictknownmarketplaces) setting in managed settings.
+プラグインソースに対する厳密な制御を必要とする組織の場合、管理者は管理設定の[`strictKnownMarketplaces`](/ja/settings#strictknownmarketplaces)設定を使用して、ユーザーが追加できるプラグインマーケットプレイスを制限できます。
 
-When `strictKnownMarketplaces` is configured in managed settings, the restriction behavior depends on the value:
+`strictKnownMarketplaces`が管理設定で設定されている場合、制限動作は値に依存します：
 
-| Value               | Behavior                                                         |
-| ------------------- | ---------------------------------------------------------------- |
-| Undefined (default) | No restrictions. Users can add any marketplace                   |
-| Empty array `[]`    | Complete lockdown. Users cannot add any new marketplaces         |
-| List of sources     | Users can only add marketplaces that match the allowlist exactly |
+| 値          | 動作                                    |
+| ---------- | ------------------------------------- |
+| 未定義（デフォルト） | 制限なし。ユーザーは任意のマーケットプレイスを追加できます         |
+| 空の配列`[]`   | 完全なロックダウン。ユーザーは新しいマーケットプレイスを追加できません   |
+| ソースのリスト    | ユーザーはアローリストと正確に一致するマーケットプレイスのみを追加できます |
 
-#### Common configurations
+#### 一般的な設定
 
-Disable all marketplace additions:
+すべてのマーケットプレイス追加を無効にする：
 
 ```json  theme={null}
 {
@@ -456,7 +416,7 @@ Disable all marketplace additions:
 }
 ```
 
-Allow specific marketplaces only:
+特定のマーケットプレイスのみを許可する：
 
 ```json  theme={null}
 {
@@ -478,131 +438,132 @@ Allow specific marketplaces only:
 }
 ```
 
-#### How restrictions work
+#### 制限の仕組み
 
-Restrictions are validated early in the plugin installation process, before any network requests or filesystem operations occur. This prevents unauthorized marketplace access attempts.
+制限はプラグインインストールプロセスの早い段階で検証され、ネットワークリクエストやファイルシステム操作が発生する前に行われます。これにより、不正なマーケットプレイスアクセス試行を防ぎます。
 
-The allowlist uses exact matching. For a marketplace to be allowed, all specified fields must match exactly:
+アローリストは完全一致を使用します。マーケットプレイスが許可されるには、指定されたすべてのフィールドが正確に一致する必要があります：
 
-* For GitHub sources: `repo` is required, and `ref` or `path` must also match if specified in the allowlist
-* For URL sources: the full URL must match exactly
+* GitHubソースの場合：`repo`は必須であり、アローリストで指定されている場合は`ref`または`path`も一致する必要があります
+* URLソースの場合：完全なURLが正確に一致する必要があります
 
-Because `strictKnownMarketplaces` is set in [managed settings](/en/settings#settings-files), individual users and project configurations cannot override these restrictions.
+`strictKnownMarketplaces`は[管理設定](/ja/settings#settings-files)で設定されるため、個々のユーザーとプロジェクト設定はこれらの制限をオーバーライドできません。
 
-For complete configuration details including all supported source types and comparison with `extraKnownMarketplaces`, see the [strictKnownMarketplaces reference](/en/settings#strictknownmarketplaces).
+サポートされているすべてのソースタイプと`extraKnownMarketplaces`との比較を含む完全な設定詳細については、[strictKnownMarketplacesリファレンス](/ja/settings#strictknownmarketplaces)を参照してください。
 
-## Validation and testing
+## 検証とテスト
 
-Test your marketplace before sharing.
+共有する前にマーケットプレイスをテストします。
 
-Validate your marketplace JSON syntax:
+マーケットプレイスJSON構文を検証します：
 
 ```bash  theme={null}
 claude plugin validate .
 ```
 
-Or from within Claude Code:
+またはClaude Code内から：
 
 ```shell  theme={null}
 /plugin validate .
 ```
 
-Add the marketplace for testing:
+テスト用にマーケットプレイスを追加します：
 
 ```shell  theme={null}
 /plugin marketplace add ./path/to/marketplace
 ```
 
-Install a test plugin to verify everything works:
+テストプラグインをインストールしてすべてが機能することを確認します：
 
 ```shell  theme={null}
 /plugin install test-plugin@marketplace-name
 ```
 
-For complete plugin testing workflows, see [Test your plugins locally](/en/plugins#test-your-plugins-locally). For technical troubleshooting, see [Plugins reference](/en/plugins-reference).
+完全なプラグインテストワークフローについては、[プラグインをローカルでテスト](/ja/plugins#test-your-plugins-locally)を参照してください。技術的なトラブルシューティングについては、[プラグインリファレンス](/ja/plugins-reference)を参照してください。
 
-## Troubleshooting
+## トラブルシューティング
 
-### Marketplace not loading
+### マーケットプレイスが読み込まれない
 
-**Symptoms**: Can't add marketplace or see plugins from it
+**症状**：マーケットプレイスを追加できない、またはそこからプラグインが見えない
 
-**Solutions**:
+**解決策**：
 
-* Verify the marketplace URL is accessible
-* Check that `.claude-plugin/marketplace.json` exists at the specified path
-* Ensure JSON syntax is valid using `claude plugin validate` or `/plugin validate`
-* For private repositories, confirm you have access permissions
+* マーケットプレイスURLがアクセス可能であることを確認します
+* 指定されたパスに`.claude-plugin/marketplace.json`が存在することを確認します
+* `claude plugin validate`または`/plugin validate`を使用してJSON構文が有効であることを確認します
+* プライベートリポジトリの場合、アクセス権限があることを確認します
 
-### Marketplace validation errors
+### マーケットプレイス検証エラー
 
-Run `claude plugin validate .` or `/plugin validate .` from your marketplace directory to check for issues. Common errors:
+マーケットプレイスディレクトリから`claude plugin validate .`または`/plugin validate .`を実行して、問題をチェックします。一般的なエラー：
 
-| Error                                             | Cause                           | Solution                                                      |
-| :------------------------------------------------ | :------------------------------ | :------------------------------------------------------------ |
-| `File not found: .claude-plugin/marketplace.json` | Missing manifest                | Create `.claude-plugin/marketplace.json` with required fields |
-| `Invalid JSON syntax: Unexpected token...`        | JSON syntax error               | Check for missing commas, extra commas, or unquoted strings   |
-| `Duplicate plugin name "x" found in marketplace`  | Two plugins share the same name | Give each plugin a unique `name` value                        |
-| `plugins[0].source: Path traversal not allowed`   | Source path contains `..`       | Use paths relative to marketplace root without `..`           |
+| エラー                                               | 原因                    | 解決策                                               |
+| :------------------------------------------------ | :-------------------- | :------------------------------------------------ |
+| `File not found: .claude-plugin/marketplace.json` | マニフェストが見つかりません        | 必須フィールドを含む`.claude-plugin/marketplace.json`を作成します |
+| `Invalid JSON syntax: Unexpected token...`        | JSON構文エラー             | 不足しているコンマ、余分なコンマ、または引用符なしの文字列をチェックします             |
+| `Duplicate plugin name "x" found in marketplace`  | 2つのプラグインが同じ名前を共有しています | 各プラグインに一意の`name`値を付与します                           |
+| `plugins[0].source: Path traversal not allowed`   | ソースパスに`..`が含まれています    | マーケットプレイスルートに相対的なパスを使用し、`..`を含めません                |
 
-**Warnings** (non-blocking):
+**警告**（ブロッキングなし）：
 
-* `Marketplace has no plugins defined`: add at least one plugin to the `plugins` array
-* `No marketplace description provided`: add `metadata.description` to help users understand your marketplace
-* `Plugin "x" uses npm source which is not yet fully implemented`: use `github` or local path sources instead
+* `Marketplace has no plugins defined`：`plugins`配列に少なくとも1つのプラグインを追加します
+* `No marketplace description provided`：ユーザーがマーケットプレイスを理解するのに役立つように`metadata.description`を追加します
+* `Plugin "x" uses npm source which is not yet fully implemented`：代わりに`github`またはローカルパスソースを使用します
 
-### Plugin installation failures
+### プラグインインストール失敗
 
-**Symptoms**: Marketplace appears but plugin installation fails
+**症状**：マーケットプレイスは表示されるがプラグインインストールが失敗する
 
-**Solutions**:
+**解決策**：
 
-* Verify plugin source URLs are accessible
-* Check that plugin directories contain required files
-* For GitHub sources, ensure repositories are public or you have access
-* Test plugin sources manually by cloning/downloading
+* プラグインソースURLがアクセス可能であることを確認します
+* プラグインディレクトリに必須ファイルが含まれていることを確認します
+* GitHubソースの場合、リポジトリが公開されているか、アクセス権限があることを確認します
+* プラグインソースを手動でクローン/ダウンロードしてテストします
 
-### Private repository authentication fails
+### プライベートリポジトリ認証が失敗する
 
-**Symptoms**: Authentication errors when installing plugins from private repositories, even with tokens configured
+**症状**：トークンが設定されていても、プライベートリポジトリからプラグインをインストールするときに認証エラーが発生する
 
-**Solutions**:
+**解決策**：
 
-* Verify your token is set in the current shell session: `echo $GITHUB_TOKEN`
-* Check that the token has the required permissions (read access to the repository)
-* For GitHub, ensure the token has the `repo` scope for private repositories
-* For GitLab, ensure the token has at least `read_repository` scope
-* Verify the token hasn't expired
-* If using multiple git providers, ensure you've set the token for the correct provider
+* トークンが現在のシェルセッションで設定されていることを確認します：`echo $GITHUB_TOKEN`
+* トークンに必要な権限（リポジトリへの読み取りアクセス）があることを確認します
+* GitHubの場合、トークンがプライベートリポジトリの`repo`スコープを持つことを確認します
+* GitLabの場合、トークンが少なくとも`read_repository`スコープを持つことを確認します
+* トークンが期限切れになっていないことを確認します
+* 複数のGitプロバイダーを使用している場合、正しいプロバイダーのトークンを設定していることを確認します
 
-### Plugins with relative paths fail in URL-based marketplaces
+### 相対パスを持つプラグインがURLベースのマーケットプレイスで失敗する
 
-**Symptoms**: Added a marketplace via URL (such as `https://example.com/marketplace.json`), but plugins with relative path sources like `"./plugins/my-plugin"` fail to install with "path not found" errors.
+**症状**：URL（`https://example.com/marketplace.json`など）経由でマーケットプレイスを追加しましたが、`"./plugins/my-plugin"`のような相対パスソースを持つプラグインが「パスが見つかりません」エラーで失敗します。
 
-**Cause**: URL-based marketplaces only download the `marketplace.json` file itself. They do not download plugin files from the server. Relative paths in the marketplace entry reference files on the remote server that were not downloaded.
+**原因**：URLベースのマーケットプレイスは`marketplace.json`ファイル自体のみをダウンロードします。サーバーからプラグインファイルをダウンロードしません。マーケットプレイスエントリの相対パスは、ダウンロードされなかったリモートサーバー上のファイルを参照します。
 
-**Solutions**:
+**解決策**：
 
-* **Use external sources**: Change plugin entries to use GitHub, npm, or git URL sources instead of relative paths:
+* **外部ソースを使用**：プラグインエントリを相対パスの代わりにGitHub、npm、またはGit URLソースを使用するように変更します：
   ```json  theme={null}
   { "name": "my-plugin", "source": { "source": "github", "repo": "owner/repo" } }
   ```
-* **Use a Git-based marketplace**: Host your marketplace in a Git repository and add it with the git URL. Git-based marketplaces clone the entire repository, making relative paths work correctly.
+* **Gitベースのマーケットプレイスを使用**：Gitリポジトリでマーケットプレイスをホストし、Git URLで追加します。Gitベースのマーケットプレイスはリポジトリ全体をクローンするため、相対パスが正しく機能します。
 
-### Files not found after installation
+### インストール後にファイルが見つからない
 
-**Symptoms**: Plugin installs but references to files fail, especially files outside the plugin directory
+**症状**：プラグインはインストールされますが、ファイルへの参照が失敗します。特にプラグインディレクトリの外のファイル
 
-**Cause**: Plugins are copied to a cache directory rather than used in-place. Paths that reference files outside the plugin's directory (such as `../shared-utils`) won't work because those files aren't copied.
+**原因**：プラグインはインプレイスで使用されるのではなく、キャッシュディレクトリにコピーされます。プラグインディレクトリの外のファイルを参照するパス（`../shared-utils`など）は、それらのファイルがコピーされないため機能しません。
 
-**Solutions**: See [Plugin caching and file resolution](/en/plugins-reference#plugin-caching-and-file-resolution) for workarounds including symlinks and directory restructuring.
+**解決策**：シンボリックリンクとディレクトリ再構成を含むワークアラウンドについては、[プラグインキャッシングとファイル解決](/ja/plugins-reference#plugin-caching-and-file-resolution)を参照してください。
 
-For additional debugging tools and common issues, see [Debugging and development tools](/en/plugins-reference#debugging-and-development-tools).
+追加のデバッグツールと一般的な問題については、[デバッグと開発ツール](/ja/plugins-reference#debugging-and-development-tools)を参照してください。
 
-## See also
+## 関連項目
 
-* [Discover and install prebuilt plugins](/en/discover-plugins) - Installing plugins from existing marketplaces
-* [Plugins](/en/plugins) - Creating your own plugins
-* [Plugins reference](/en/plugins-reference) - Complete technical specifications and schemas
-* [Plugin settings](/en/settings#plugin-settings) - Plugin configuration options
-* [strictKnownMarketplaces reference](/en/settings#strictknownmarketplaces) - Managed marketplace restrictions
+* [既成プラグインの検出とインストール](/ja/discover-plugins) - 既存のマーケットプレイスからプラグインをインストール
+* [プラグイン](/ja/plugins) - 独自のプラグインの作成
+* [プラグインリファレンス](/ja/plugins-reference) - 完全な技術仕様とスキーマ
+* [プラグイン設定](/ja/settings#plugin-settings) - プラグイン設定オプション
+* [strictKnownMarketplacesリファレンス](/ja/settings#strictknownmarketplaces) - マネージドマーケットプレイス制限
+

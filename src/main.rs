@@ -251,10 +251,24 @@ fn install_plugin(plugin: &model::PluginEntry, dest: &Path, marketplace_repo: &s
 
     let (git_url, subpath, git_ref) = match &plugin.source {
         PluginSource::Path(p) => {
-            // If plugin has explicit repository metadata, usage it as the base for the relative path
-            // Otherwise use the marketplace repo.
-            let repo_url = if let Some(repo) = &plugin.repository {
-                // If it's a full URL, use it. If it's owner/repo, format it.
+            // Prioritize `author.url` if present, then `repository` field, then fallback to marketplace_repo.
+            let repo_url = if let Some(author) = &plugin.author {
+                if let Some(url) = &author.url {
+                    if url.starts_with("http") || url.starts_with("git@") {
+                        url.clone()
+                    } else {
+                        format!("https://github.com/{}.git", url)
+                    }
+                } else if let Some(repo) = &plugin.repository {
+                    if repo.starts_with("http") || repo.starts_with("git@") {
+                        repo.clone()
+                    } else {
+                        format!("https://github.com/{}.git", repo)
+                    }
+                } else {
+                    format!("https://github.com/{}.git", marketplace_repo)
+                }
+            } else if let Some(repo) = &plugin.repository {
                 if repo.starts_with("http") || repo.starts_with("git@") {
                     repo.clone()
                 } else {

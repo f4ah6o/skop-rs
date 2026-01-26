@@ -32,10 +32,18 @@ pub struct PluginEntry {
     pub description: Option<String>,
     pub version: Option<String>,
     pub repository: Option<String>,
+    pub author: Option<Author>,
     // There are many other optional fields, we can add them as needed or use flattened HashMap for extras
     // For version comparison, 'version' is key.
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Author {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -150,6 +150,9 @@ fn main() -> Result<()> {
         Commands::Remove => {
             handle_remove()?;
         }
+        Commands::List => {
+            handle_list()?;
+        }
     }
 
     Ok(())
@@ -165,6 +168,7 @@ fn init_logger(cli: &Cli) {
             }
         }
         Commands::Remove => "warn",
+        Commands::List => "warn",
     };
     let env = env_logger::Env::default().default_filter_or(default_level);
     let _ = env_logger::Builder::from_env(env).try_init();
@@ -311,6 +315,18 @@ fn handle_remove() -> Result<()> {
     }
 
     println!("Removed {} skill(s).", selected.len());
+    Ok(())
+}
+
+fn handle_list() -> Result<()> {
+    let entries = collect_installed_skills()?;
+    if entries.is_empty() {
+        println!("No skills installed.");
+        return Ok(());
+    }
+    for entry in entries {
+        println!("{} ({})", entry.name, entry.target);
+    }
     Ok(())
 }
 

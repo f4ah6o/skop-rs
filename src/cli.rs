@@ -31,6 +31,8 @@ pub enum Commands {
     },
     /// Remove installed skills interactively
     Remove,
+    /// List installed skills
+    List,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]

@@ -46,12 +46,21 @@ skop remove
 - Press Enter, then confirm with `y` to remove.
 - Select `all` to toggle every skill at once.
 
+### List Skills
+
+```bash
+skop list
+```
+
+- Prints installed skills as `<skill name> (<target>)`.
+
 ### Help
 
 ```bash
 skop --help
 skop add --help
 skop remove --help
+skop list --help
 ```
 
 ### Examples

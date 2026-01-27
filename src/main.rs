@@ -48,7 +48,27 @@ fn main() -> Result<()> {
             repo,
         } => {
             let options = InstallOptions { dry_run, max_depth };
-            handle_add(target, &repo, options)?;
+            if target == Target::All {
+                let mut failed = Vec::new();
+                for target in [Target::Codex, Target::Opencode, Target::Antigravity] {
+                    if let Err(err) = handle_add(target, &repo, options) {
+                        eprintln!("Target {} failed: {}", target, err);
+                        failed.push(target);
+                    }
+                }
+                if !failed.is_empty() {
+                    return Err(anyhow!(
+                        "Failed targets: {}",
+                        failed
+                            .into_iter()
+                            .map(|t| t.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ));
+                }
+            } else {
+                handle_add(target, &repo, options)?;
+            }
         }
         Commands::Remove => {
             handle_remove()?;
@@ -77,6 +97,7 @@ fn handle_add(target: Target, repo: &str, options: InstallOptions) -> Result<()>
     let skills_dir = util::get_skills_dir(target);
     if options.dry_run {
         println!("Dry run: no files will be modified.");
+        println!("Target: {}", target);
     } else {
         fs::create_dir_all(&skills_dir).context("Failed to create skills directory")?;
         fs::create_dir_all(skills_dir.join(".skop")).context("Failed to create metadata dir")?;
@@ -233,7 +254,7 @@ fn interactive_select_skills(entries: &[SkillEntry]) -> Result<Vec<SkillEntry>> 
     let mut selected = vec![false; entries.len()];
     let mut index = 0usize;
     let mut stdout = io::stdout();
-    let _guard = RawModeGuard::new()?;
+    let _guard = RawModeGuard::new(&mut stdout)?;
 
     loop {
         render_skill_list(&mut stdout, entries, &selected, index)?;
@@ -283,18 +304,35 @@ fn render_skill_list(
 ) -> Result<()> {
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
     execute!(stdout, cursor::MoveTo(0, 0))?;
-    writeln!(
-        stdout,
-        "Select skills to remove (space: toggle, ↑/↓: move, enter: confirm, q: quit)"
-    )?;
-    for (idx, entry) in entries.iter().enumerate() {
+    let (cols, rows) = terminal::size()?;
+    let width = cols as usize;
+    let max_rows = rows as usize;
+    let header = fit_line(
+        "Select skills to remove (space: toggle, up/down: move, enter: confirm, q: quit)",
+        width,
+    );
+    execute!(stdout, cursor::MoveTo(0, 0))?;
+    writeln!(stdout, "{header}")?;
+
+    let available = max_rows.saturating_sub(1);
+    let start = if index >= available && available > 0 {
+        index + 1 - available
+    } else {
+        0
+    };
+    let end = usize::min(start + available, entries.len());
+    for (row, idx) in (start..end).enumerate() {
+        let entry = &entries[idx];
         let cursor = if idx == index { ">" } else { " " };
         let mark = if selected.get(idx).copied().unwrap_or(false) {
             "x"
         } else {
             " "
         };
-        writeln!(stdout, "{} [{}] {} ({})", cursor, mark, entry.name, entry.target)?;
+        let line = format!("{} [{}] {} ({})", cursor, mark, entry.name, entry.target);
+        let line = fit_line(&line, width);
+        execute!(stdout, cursor::MoveTo(0, (row + 1) as u16))?;
+        writeln!(stdout, "{line}")?;
     }
     stdout.flush()?;
     Ok(())
@@ -303,8 +341,9 @@ fn render_skill_list(
 struct RawModeGuard;
 
 impl RawModeGuard {
-    fn new() -> Result<Self> {
+    fn new(stdout: &mut io::Stdout) -> Result<Self> {
         terminal::enable_raw_mode()?;
+        execute!(stdout, terminal::DisableLineWrap, cursor::Hide)?;
         Ok(Self)
     }
 }
@@ -312,7 +351,23 @@ impl RawModeGuard {
 impl Drop for RawModeGuard {
     fn drop(&mut self) {
         let _ = terminal::disable_raw_mode();
+        let mut stdout = io::stdout();
+        let _ = execute!(stdout, terminal::EnableLineWrap, cursor::Show);
     }
+}
+
+fn fit_line(line: &str, width: usize) -> String {
+    let mut out = String::new();
+    for ch in line.chars() {
+        if out.len() >= width {
+            break;
+        }
+        out.push(ch);
+    }
+    if out.len() < width {
+        out.push_str(&" ".repeat(width - out.len()));
+    }
+    out
 }
 
 fn confirm_removal(count: usize) -> Result<bool> {

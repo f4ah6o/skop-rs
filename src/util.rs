@@ -9,6 +9,7 @@ pub fn get_skills_dir(target: Target) -> PathBuf {
         Target::Codex => current_dir.join(".codex/skills"),
         Target::Opencode => current_dir.join(".opencode/skills"),
         Target::Antigravity => current_dir.join(".agent/skills"),
+        Target::All => unreachable!("Target::All should be handled before resolving a skills dir"),
     }
 }
 

@@ -31,6 +31,7 @@ skop add --target <TARGET> <OWNER/REPO>
     - `codex`: Installs to `$CWD/.codex/skills`
     - `opencode`: Installs to `$CWD/.opencode/skills`
     - `antigravity`: Installs to `$CWD/.agent/skills`
+    - `all`: Installs to all supported agent skill directories
 - **OWNER/REPO**: The GitHub repository containing the `marketplace.json` file (e.g., `owner/my-marketplace`).
 - **Options**:
     - `--dry-run`: Print what would be installed without writing files.
@@ -57,6 +58,11 @@ skop add --target codex my-org/coding-skills
 Install skills for **Opencode**:
 ```bash
 skop add --target opencode community-skills/python-tools
+```
+
+Install skills for **all** agents:
+```bash
+skop add --target all community-skills/python-tools
 ```
 
 ## Marketplace Format

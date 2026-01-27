@@ -14,7 +14,7 @@ pub struct Cli {
 pub enum Commands {
     /// Add a marketplace and install skills
     Add {
-        /// Target environment (codex, opencode, antigravity)
+        /// Target environment (codex, opencode, antigravity, all)
         #[arg(long, value_enum)]
         target: Target,
 
@@ -42,6 +42,7 @@ pub enum Target {
     Codex,
     Opencode,
     Antigravity,
+    All,
 }
 
 impl fmt::Display for Target {
@@ -50,6 +51,7 @@ impl fmt::Display for Target {
             Target::Codex => write!(f, "codex"),
             Target::Opencode => write!(f, "opencode"),
             Target::Antigravity => write!(f, "antigravity"),
+            Target::All => write!(f, "all"),
         }
     }
 }

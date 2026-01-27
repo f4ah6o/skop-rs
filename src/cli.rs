@@ -26,7 +26,7 @@ pub enum Commands {
         #[arg(long)]
         verbose: bool,
 
-        /// Maximum recursion depth when resolving nested marketplaces
+        /// Maximum recursion depth when resolving nested marketplaces (default: 1)
         #[arg(long, default_value_t = 1)]
         max_depth: usize,
 

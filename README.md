@@ -48,6 +48,14 @@ skop remove
 - Use arrow keys to move, space to toggle selection.
 - Press Enter, then confirm with `y` to remove.
 
+### Help
+
+```bash
+skop --help
+skop add --help
+skop remove --help
+```
+
 ### Examples
 
 Install skills for **Codex** from a marketplace:
@@ -106,6 +114,7 @@ Example `marketplace.json`:
 3. **Check**: It compares the `version` in `marketplace.json` with the locally stored metadata.
 4. **Install/Update**: If the plugin is new or has a higher version, Skop clones the repository (shallow clone), discovers skill folders (directories containing `SKILL.md`), and copies them into the agent's skill directory. It stores install metadata in `.skop/<plugin>.json`.
     - Skill discovery prefers `skills` or `agents` paths in the plugin entry when provided, otherwise it falls back to the conventional `skills/` layout.
+    - Dry-run mode prints detected skills, marketplace presence, and recursion steps without writing files.
 
 ## License
 

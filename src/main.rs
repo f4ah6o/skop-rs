@@ -109,16 +109,16 @@ fn main() -> Result<()> {
             };
             let marketplace = fetch_marketplace(&repo)?;
             let mut clone_cache = CloneCache::new();
-            let targets = select_targets()?;
-            if targets.is_empty() {
-                println!("No targets selected.");
-                return Ok(());
-            }
             print_progress("Scanning marketplace to build skill list...")?;
             let plan = plan_marketplace_skills(&marketplace, &repo, options, &mut clone_cache)?;
             let selected_skills = select_skills(&plan)?;
             if selected_skills.is_empty() {
                 println!("No skills selected.");
+                return Ok(());
+            }
+            let targets = select_targets()?;
+            if targets.is_empty() {
+                println!("No targets selected.");
                 return Ok(());
             }
             let mut failed = Vec::new();

@@ -1,6 +1,6 @@
 # Skop - Skill Manager for AI Coding Agents
 
-> SKill On (Claude) Plugin marketplace
+> SKill On claude Plugin marketplace
 
 Skop is a CLI tool designed to manage skills for various AI coding agents, including Codex, Opencode, and Antigravity. It allows you to easily install and update skills defined in a Claude Plugin Marketplace.
 

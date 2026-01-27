@@ -3,6 +3,7 @@ name = "skop"
 version = "2026.1.0"
 edition = "2024"
 description = "Skill manager for AI coding agents (Codex, Opencode, Antigravity)"
+repository = "https://github.com/f4ah6o/skop-rs"
 license = "MIT"
 
 [dependencies]

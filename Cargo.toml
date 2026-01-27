@@ -1,6 +1,6 @@
 [package]
 name = "skop"
-version = "2026.1.0"
+version = "2026.1.1"
 edition = "2024"
 description = "Skill manager for AI coding agents (Codex, Opencode, Antigravity)"
 repository = "https://github.com/f4ah6o/skop-rs"

@@ -25,34 +25,37 @@ jobs:
 
     - uses: rust-lang/crates-io-auth-action@v1
       id: auth
-      
-    # === 追加: バージョンチェックのロジック ===
-    - name: Check if version already exists
+
+    # === 修正: cargo search を使った判定ロジック ===
+    - name: Check version with cargo search
       id: check
       shell: bash
       run: |
-        # cargo metadata からパッケージ名とバージョンを取得
-        METADATA=$(cargo metadata --no-deps --format-version 1)
-        NAME=$(echo "$METADATA" | jq -r '.packages[0].name')
-        VERSION=$(echo "$METADATA" | jq -r '.packages[0].version')
+        # 1. Cargo.toml からローカルのパッケージ名とバージョンを取得 (簡易grep)
+        # ※ ワークスペース構成などの場合はパス調整が必要ですが、単一クレートならこれでOK
+        NAME=$(grep -m1 '^name =' Cargo.toml | cut -d '"' -f 2)
+        VERSION=$(grep -m1 '^version =' Cargo.toml | cut -d '"' -f 2)
         
-        echo "Checking $NAME version $VERSION on crates.io..."
+        echo "Checking logic for: $NAME = \"$VERSION\""
+
+        # 2. cargo search で検索し、現在のバージョンが既に公開されているか確認
+        # 重要: 色コードが入るとgrepが失敗するため、ここだけ color=never にする
+        SEARCH_RESULT=$(CARGO_TERM_COLOR=never cargo search "$NAME" --limit 1)
         
-        # crates.io APIを叩いてステータスコードを取得 (200なら存在、404なら未存在)
-        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/$NAME/$VERSION")
-        
-        if [ "$HTTP_STATUS" == "200" ]; then
-          echo "Version $VERSION already exists. Skipping publish."
+        # 3. 出力行の中に 'package_name = "version"' が完全に一致するものがあるか判定
+        if echo "$SEARCH_RESULT" | grep -q "^$NAME = \"$VERSION\""; then
+          echo "::notice::Version $VERSION is already published on crates.io. Skipping."
           echo "should_publish=false" >> $GITHUB_OUTPUT
         else
-          echo "Version $VERSION not found. Proceeding to publish."
+          echo "::notice::Version $VERSION not found on crates.io (or implies update). Ready to publish."
           echo "should_publish=true" >> $GITHUB_OUTPUT
         fi
 
+    # テストは常に実行（公開済みでも動作確認のため）
     - run: cargo test --verbose
 
     - name: Publish
-      # バージョンが新しく、かつ Pushイベントの時のみ実行 (PRでの事故防止)
+      # チェックが true (未公開) かつ Pushイベントの時のみ実行
       if: steps.check.outputs.should_publish == 'true' && github.event_name == 'push'
       run: cargo publish
       env:

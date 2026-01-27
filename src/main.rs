@@ -36,6 +36,61 @@ struct InstallOptions {
     quiet: bool,
 }
 
+#[derive(Hash, Eq, PartialEq)]
+struct CacheKey {
+    repo: String,
+    git_ref: Option<String>,
+}
+
+struct CloneCache {
+    entries: HashMap<CacheKey, tempfile::TempDir>,
+}
+
+impl CloneCache {
+    fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    fn get_or_clone(
+        &mut self,
+        git_url: &str,
+        git_ref: Option<&str>,
+        options: InstallOptions,
+    ) -> Result<PathBuf> {
+        let key = CacheKey {
+            repo: git_url.to_string(),
+            git_ref: git_ref.map(|value| value.to_string()),
+        };
+        if let Some(dir) = self.entries.get(&key) {
+            return Ok(dir.path().to_path_buf());
+        }
+
+        let temp_dir = tempfile::Builder::new().prefix("skop_install").tempdir()?;
+        if !options.quiet {
+            info!("Cloning {} ...", git_url);
+        }
+        let mut cmd = Command::new("git");
+        cmd.arg("clone").arg("--depth").arg("1");
+        if let Some(r) = git_ref {
+            cmd.arg("--branch").arg(r);
+        }
+        cmd.arg(git_url).arg(temp_dir.path());
+
+        let output = cmd.output().context("Failed to execute git clone")?;
+        if !output.status.success() {
+            return Err(anyhow!(
+                "Git clone failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        let path = temp_dir.path().to_path_buf();
+        self.entries.insert(key, temp_dir);
+        Ok(path)
+    }
+}
 fn main() -> Result<()> {
     let cli = Cli::parse();
     init_logger(&cli);
@@ -53,12 +108,14 @@ fn main() -> Result<()> {
                 quiet: false,
             };
             let marketplace = fetch_marketplace(&repo)?;
+            let mut clone_cache = CloneCache::new();
             let targets = select_targets()?;
             if targets.is_empty() {
                 println!("No targets selected.");
                 return Ok(());
             }
-            let plan = plan_marketplace_skills(&marketplace, &repo, options)?;
+            print_progress("Scanning marketplace to build skill list...")?;
+            let plan = plan_marketplace_skills(&marketplace, &repo, options, &mut clone_cache)?;
             let selected_skills = select_skills(&plan)?;
             if selected_skills.is_empty() {
                 println!("No skills selected.");
@@ -73,6 +130,7 @@ fn main() -> Result<()> {
                     &plan.by_plugin,
                     options,
                     &selected_skills,
+                    &mut clone_cache,
                 ) {
                     eprintln!("Target {} failed: {}", target, err);
                     failed.push(target);
@@ -119,6 +177,7 @@ fn handle_add(
     skills_by_plugin: &HashMap<String, Vec<String>>,
     options: InstallOptions,
     selected_skills: &HashSet<String>,
+    clone_cache: &mut CloneCache,
 ) -> Result<()> {
     let skills_dir = util::get_skills_dir(target);
     if options.dry_run {
@@ -126,7 +185,6 @@ fn handle_add(
         println!("Target: {}", target);
     } else {
         fs::create_dir_all(&skills_dir).context("Failed to create skills directory")?;
-        fs::create_dir_all(skills_dir.join(".skop")).context("Failed to create metadata dir")?;
     }
 
     let plugin_root = marketplace
@@ -180,6 +238,7 @@ fn handle_add(
             plugin_root,
             options,
             Some(&selected_for_plugin),
+            clone_cache,
         )?;
 
         if options.dry_run {
@@ -248,6 +307,7 @@ fn handle_remove() -> Result<()> {
 
     for (skills_dir, removed) in removed_by_dir {
         cleanup_metadata(&skills_dir, &removed)?;
+        cleanup_empty_skill_dirs(&skills_dir)?;
     }
 
     println!("Removed {} skill(s).", selected.len());
@@ -280,6 +340,7 @@ fn plan_marketplace_skills(
     marketplace: &Marketplace,
     repo: &str,
     options: InstallOptions,
+    clone_cache: &mut CloneCache,
 ) -> Result<SkillPlan> {
     let mut by_plugin = HashMap::new();
     let mut all = HashSet::new();
@@ -303,6 +364,7 @@ fn plan_marketplace_skills(
             plugin_root,
             plan_options,
             None,
+            clone_cache,
         )?;
         for skill in &skills {
             all.insert(skill.clone());
@@ -317,14 +379,19 @@ fn plan_marketplace_skills(
 
 fn select_targets() -> Result<Vec<Target>> {
     let targets = vec![
+        Target::All,
         Target::Codex,
         Target::Opencode,
         Target::Antigravity,
-        Target::All,
     ];
     let labels: Vec<String> = targets.iter().map(|t| t.to_string()).collect();
     let preselected = vec![false; labels.len()];
-    let selected = interactive_select_labels("Select targets", &labels, &preselected)?;
+    let selected = interactive_select_labels(
+        "Select targets (space: toggle, ↑/↓: move, enter: confirm, q: quit)",
+        &labels,
+        &preselected,
+        true,
+    )?;
     if let Some(all_index) = targets.iter().position(|t| *t == Target::All) {
         if selected.get(all_index).copied().unwrap_or(false) {
             return Ok(vec![Target::Codex, Target::Opencode, Target::Antigravity]);
@@ -343,8 +410,12 @@ fn select_skills(plan: &SkillPlan) -> Result<HashSet<String>> {
         return Ok(HashSet::new());
     }
     let preselected = vec![true; plan.all_skills.len()];
-    let selected =
-        interactive_select_labels("Select skills to install", &plan.all_skills, &preselected)?;
+    let selected = interactive_select_labels(
+        "Select skills to install (space: toggle, ↑/↓: move, enter: confirm, q: quit)",
+        &plan.all_skills,
+        &preselected,
+        true,
+    )?;
     let chosen = plan
         .all_skills
         .iter()
@@ -384,13 +455,14 @@ fn collect_installed_skills() -> Result<Vec<SkillEntry>> {
 }
 
 fn interactive_select_skills(entries: &[SkillEntry]) -> Result<Vec<SkillEntry>> {
-    let mut selected = vec![false; entries.len()];
+    let mut selected = vec![false; entries.len() + 1];
     let mut index = 0usize;
     let mut stdout = io::stdout();
     let _guard = RawModeGuard::new(&mut stdout)?;
+    let mut status: Option<String> = None;
 
     loop {
-        render_skill_list(&mut stdout, entries, &selected, index)?;
+        render_skill_list(&mut stdout, entries, &selected, index, status.as_deref())?;
         match event::read()? {
             event::Event::Key(key) => match key.code {
                 event::KeyCode::Char('q') | event::KeyCode::Esc => {
@@ -401,18 +473,33 @@ fn interactive_select_skills(entries: &[SkillEntry]) -> Result<Vec<SkillEntry>> 
                     if index > 0 {
                         index -= 1;
                     }
+                    status = None;
                 }
                 event::KeyCode::Down => {
-                    if index + 1 < entries.len() {
+                    if index + 1 < selected.len() {
                         index += 1;
                     }
+                    status = None;
                 }
                 event::KeyCode::Char(' ') => {
-                    if let Some(state) = selected.get_mut(index) {
+                    if index == 0 {
+                        let new_state = !selected[0];
+                        for state in &mut selected {
+                            *state = new_state;
+                        }
+                    } else if let Some(state) = selected.get_mut(index) {
                         *state = !*state;
+                        selected[0] = selected.iter().skip(1).all(|value| *value);
                     }
+                    status = None;
                 }
-                event::KeyCode::Enter => break,
+                event::KeyCode::Enter => {
+                    if !selected.iter().skip(1).any(|value| *value) {
+                        status = Some("Select at least one item.".to_string());
+                        continue;
+                    }
+                    break;
+                }
                 _ => {}
             },
             _ => {}
@@ -423,7 +510,7 @@ fn interactive_select_skills(entries: &[SkillEntry]) -> Result<Vec<SkillEntry>> 
     let chosen: Vec<SkillEntry> = entries
         .iter()
         .cloned()
-        .zip(selected.into_iter())
+        .zip(selected.into_iter().skip(1))
         .filter_map(|(entry, is_selected)| if is_selected { Some(entry) } else { None })
         .collect();
     Ok(chosen)
@@ -433,6 +520,7 @@ fn interactive_select_labels(
     title: &str,
     labels: &[String],
     preselected: &[bool],
+    require_one: bool,
 ) -> Result<Vec<bool>> {
     let mut selected = vec![false; labels.len()];
     for (idx, value) in preselected.iter().copied().enumerate() {
@@ -443,9 +531,10 @@ fn interactive_select_labels(
     let mut index = 0usize;
     let mut stdout = io::stdout();
     let _guard = RawModeGuard::new(&mut stdout)?;
+    let mut status: Option<String> = None;
 
     loop {
-        render_label_list(&mut stdout, title, labels, &selected, index)?;
+        render_label_list(&mut stdout, title, labels, &selected, index, status.as_deref())?;
         match event::read()? {
             event::Event::Key(key) => match key.code {
                 event::KeyCode::Char('q') | event::KeyCode::Esc => {
@@ -456,18 +545,27 @@ fn interactive_select_labels(
                     if index > 0 {
                         index -= 1;
                     }
+                    status = None;
                 }
                 event::KeyCode::Down => {
                     if index + 1 < labels.len() {
                         index += 1;
                     }
+                    status = None;
                 }
                 event::KeyCode::Char(' ') => {
                     if let Some(state) = selected.get_mut(index) {
                         *state = !*state;
                     }
+                    status = None;
                 }
-                event::KeyCode::Enter => break,
+                event::KeyCode::Enter => {
+                    if require_one && !selected.iter().any(|value| *value) {
+                        status = Some("Select at least one item.".to_string());
+                        continue;
+                    }
+                    break;
+                }
                 _ => {}
             },
             _ => {}
@@ -484,12 +582,17 @@ fn render_label_list(
     labels: &[String],
     selected: &[bool],
     index: usize,
+    status: Option<&str>,
 ) -> Result<()> {
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
     let (cols, rows) = terminal::size()?;
     let width = cols as usize;
     let max_rows = rows as usize;
-    let header = fit_line(title, width);
+    let header = if let Some(status) = status {
+        fit_line(&format!("{title} — {status}"), width)
+    } else {
+        fit_line(title, width)
+    };
     execute!(stdout, cursor::MoveTo(0, 0))?;
     writeln!(stdout, "{header}")?;
 
@@ -517,40 +620,69 @@ fn render_label_list(
     Ok(())
 }
 
+fn print_progress(message: &str) -> Result<()> {
+    let mut stdout = io::stdout();
+    execute!(
+        stdout,
+        terminal::EnableLineWrap,
+        cursor::Show,
+        cursor::MoveToColumn(0),
+        terminal::Clear(terminal::ClearType::CurrentLine)
+    )?;
+    writeln!(stdout, "{message}")?;
+    stdout.flush()?;
+    Ok(())
+}
+
 fn render_skill_list(
     stdout: &mut io::Stdout,
     entries: &[SkillEntry],
     selected: &[bool],
     index: usize,
+    status: Option<&str>,
 ) -> Result<()> {
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
     execute!(stdout, cursor::MoveTo(0, 0))?;
     let (cols, rows) = terminal::size()?;
     let width = cols as usize;
     let max_rows = rows as usize;
-    let header = fit_line(
-        "Select skills to remove (space: toggle, up/down: move, enter: confirm, q: quit)",
-        width,
-    );
-    execute!(stdout, cursor::MoveTo(0, 0))?;
+    let header = if let Some(status) = status {
+        fit_line(
+            &format!(
+                "Select skills to remove (space: toggle, ↑/↓: move, enter: confirm, q: quit) — {status}"
+            ),
+            width,
+        )
+    } else {
+        fit_line(
+            "Select skills to remove (space: toggle, ↑/↓: move, enter: confirm, q: quit)",
+            width,
+        )
+    };
     writeln!(stdout, "{header}")?;
 
+    let total = selected.len();
     let available = max_rows.saturating_sub(1);
     let start = if index >= available && available > 0 {
         index + 1 - available
     } else {
         0
     };
-    let end = usize::min(start + available, entries.len());
+    let end = usize::min(start + available, total);
     for (row, idx) in (start..end).enumerate() {
-        let entry = &entries[idx];
+        let line = if idx == 0 {
+            "all".to_string()
+        } else {
+            let entry = &entries[idx - 1];
+            format!("{} ({})", entry.name, entry.target)
+        };
         let cursor = if idx == index { ">" } else { " " };
         let mark = if selected.get(idx).copied().unwrap_or(false) {
             "x"
         } else {
             " "
         };
-        let line = format!("{} [{}] {} ({})", cursor, mark, entry.name, entry.target);
+        let line = format!("{} [{}] {}", cursor, mark, line);
         let line = fit_line(&line, width);
         execute!(stdout, cursor::MoveTo(0, (row + 1) as u16))?;
         writeln!(stdout, "{line}")?;
@@ -564,7 +696,12 @@ struct RawModeGuard;
 impl RawModeGuard {
     fn new(stdout: &mut io::Stdout) -> Result<Self> {
         terminal::enable_raw_mode()?;
-        execute!(stdout, terminal::DisableLineWrap, cursor::Hide)?;
+        execute!(
+            stdout,
+            terminal::EnterAlternateScreen,
+            terminal::DisableLineWrap,
+            cursor::Hide
+        )?;
         Ok(Self)
     }
 }
@@ -573,7 +710,12 @@ impl Drop for RawModeGuard {
     fn drop(&mut self) {
         let _ = terminal::disable_raw_mode();
         let mut stdout = io::stdout();
-        let _ = execute!(stdout, terminal::EnableLineWrap, cursor::Show);
+        let _ = execute!(
+            stdout,
+            terminal::EnableLineWrap,
+            cursor::Show,
+            terminal::LeaveAlternateScreen
+        );
     }
 }
 
@@ -676,6 +818,9 @@ fn write_plugin_metadata(
     metadata: &PluginInstallMetadata,
 ) -> Result<()> {
     let path = plugin_metadata_path(skills_dir, plugin_name);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).context("Failed to create metadata dir")?;
+    }
     let content = serde_json::to_string_pretty(metadata)?;
     fs::write(path, content).context("Failed to write plugin metadata")
 }
@@ -723,6 +868,32 @@ fn cleanup_metadata(skills_dir: &Path, removed_skills: &HashSet<String>) -> Resu
     Ok(())
 }
 
+fn cleanup_empty_skill_dirs(skills_dir: &Path) -> Result<()> {
+    if !skills_dir.exists() {
+        return Ok(());
+    }
+
+    let meta_dir = skills_dir.join(".skop");
+    if meta_dir.exists() && is_dir_empty(&meta_dir)? {
+        fs::remove_dir(&meta_dir)?;
+    }
+
+    if is_dir_empty(skills_dir)? {
+        fs::remove_dir(skills_dir)?;
+        if let Some(parent) = skills_dir.parent() {
+            if parent.exists() && is_dir_empty(parent)? {
+                fs::remove_dir(parent)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn is_dir_empty(path: &Path) -> Result<bool> {
+    Ok(fs::read_dir(path)?.next().is_none())
+}
+
 fn remove_installed_skills(
     skills_dir: &Path,
     plugin_name: &str,
@@ -750,6 +921,7 @@ fn install_plugin(
     plugin_root: Option<&str>,
     options: InstallOptions,
     selected_skills: Option<&HashSet<String>>,
+    clone_cache: &mut CloneCache,
 ) -> Result<Vec<String>> {
     let mut visited = HashSet::new();
     install_plugin_recursive(
@@ -761,6 +933,7 @@ fn install_plugin(
         &mut visited,
         options,
         selected_skills,
+        clone_cache,
     )
 }
 
@@ -773,6 +946,7 @@ fn install_plugin_recursive(
     visited: &mut HashSet<String>,
     options: InstallOptions,
     selected_skills: Option<&HashSet<String>>,
+    clone_cache: &mut CloneCache,
 ) -> Result<Vec<String>> {
     if depth > options.max_depth {
         return handle_missing_skills(
@@ -799,8 +973,7 @@ fn install_plugin_recursive(
         );
     }
 
-    let temp_dir = tempfile::Builder::new().prefix("skop_install").tempdir()?;
-    info!("Cloning {} ...", git_url);
+    let repo_root = clone_cache.get_or_clone(&git_url, git_ref.as_deref(), options)?;
     if options.dry_run && !options.quiet {
         let indent = "  ".repeat(depth + 1);
         println!("{indent}repo: {}", git_url);
@@ -808,23 +981,6 @@ fn install_plugin_recursive(
             println!("{indent}source path: {}", subpath);
         }
     }
-
-    let mut cmd = Command::new("git");
-    cmd.arg("clone").arg("--depth").arg("1");
-    if let Some(r) = &git_ref {
-        cmd.arg("--branch").arg(r);
-    }
-    cmd.arg(&git_url).arg(temp_dir.path());
-
-    let output = cmd.output().context("Failed to execute git clone")?;
-    if !output.status.success() {
-        return Err(anyhow!(
-            "Git clone failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-
-    let repo_root = temp_dir.path().to_path_buf();
     let source_path = if let Some(p) = subpath {
         repo_root.join(p)
     } else {
@@ -847,7 +1003,7 @@ fn install_plugin_recursive(
                 }
                 return Ok(extract_skill_names(skill_paths));
             }
-            return install_skills_from_paths(skills_dir, skill_paths);
+            return install_skills_from_paths(skills_dir, skill_paths, options);
         }
     }
 
@@ -878,6 +1034,7 @@ fn install_plugin_recursive(
                 visited,
                 options,
                 selected_skills,
+                clone_cache,
             );
         }
         if options.dry_run && !options.quiet {
@@ -911,6 +1068,7 @@ fn install_from_marketplace_entry(
     visited: &mut HashSet<String>,
     options: InstallOptions,
     selected_skills: Option<&HashSet<String>>,
+    clone_cache: &mut CloneCache,
 ) -> Result<Vec<String>> {
     match &plugin.source {
         PluginSource::Path(path) => {
@@ -944,7 +1102,7 @@ fn install_from_marketplace_entry(
                 }
                 return Ok(extract_skill_names(skill_paths));
             }
-            install_skills_from_paths(skills_dir, skill_paths)
+            install_skills_from_paths(skills_dir, skill_paths, options)
         }
         PluginSource::Object(_) => {
             if options.dry_run && !options.quiet {
@@ -960,6 +1118,7 @@ fn install_from_marketplace_entry(
                 visited,
                 options,
                 selected_skills,
+                clone_cache,
             )
         }
     }
@@ -1010,7 +1169,11 @@ fn filter_skill_paths(
         .collect()
 }
 
-fn install_skills_from_paths(skills_dir: &Path, skill_paths: Vec<PathBuf>) -> Result<Vec<String>> {
+fn install_skills_from_paths(
+    skills_dir: &Path,
+    skill_paths: Vec<PathBuf>,
+    options: InstallOptions,
+) -> Result<Vec<String>> {
     let mut installed_skills = Vec::new();
     for skill_path in skill_paths {
         let Some(skill_name) = skill_path
@@ -1021,6 +1184,9 @@ fn install_skills_from_paths(skills_dir: &Path, skill_paths: Vec<PathBuf>) -> Re
             continue;
         };
 
+        if !options.quiet {
+            println!("Installing skill: {}", skill_name);
+        }
         let dest = skills_dir.join(&skill_name);
         if dest.exists() {
             fs::remove_dir_all(&dest).with_context(|| {

@@ -44,6 +44,7 @@ skop remove
 - Lists installed skills across all supported agent directories as `<skill name> (<agent>)`.
 - Use arrow keys to move, space to toggle selection.
 - Press Enter, then confirm with `y` to remove.
+- Select `all` to toggle every skill at once.
 
 ### Help
 

@@ -3,6 +3,7 @@ name: Rust
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*.*.*" ] # バージョンタグ（例: v0.1.0）が打たれた時にも発動
   pull_request:
     branches: [ "main" ]
 
@@ -14,19 +15,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    
+    # ツールチェーンの固定（推奨）
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    # ビルドキャッシュの有効化（推奨）
+    - uses: swatinem/rust-cache@v2
+
     - name: Build
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+
   publish:
+    # テストが通った場合のみ、かつタグが打たれた場合のみ実行
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    environment: release  # Optional: for enhanced security
+    environment: release
     permissions:
-      id-token: write     # Required for OIDC token exchange
+      id-token: write
+      contents: read # checkoutのために必要
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v4 # 修正: v6 -> v4
+    
+    - uses: dtolnay/rust-toolchain@stable
+
     - uses: rust-lang/crates-io-auth-action@v1
       id: auth
+      
     - run: cargo publish
       env:
         CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

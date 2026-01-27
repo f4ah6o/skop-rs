@@ -23,14 +23,12 @@ cargo install --path .
 
 ### Add a Marketplace
 
-To add skills from a marketplace, Skop now prompts you to select the targets and skills interactively:
+To add skills from a marketplace, Skop prompts you to select the targets and skills interactively:
 
 ```bash
-skop add --target <TARGET> <OWNER/REPO>
+skop add <OWNER/REPO>
 ```
 
-- **TARGET**: Used as the initial selection in the target picker. One of:
-    - `codex`, `opencode`, `antigravity`, `all`
 - **OWNER/REPO**: The GitHub repository containing the `marketplace.json` file (e.g., `owner/my-marketplace`).
 - **Options**:
     - `--dry-run`: Print what would be installed without writing files.
@@ -57,19 +55,9 @@ skop remove --help
 
 ### Examples
 
-Install skills for **Codex** (preselected in the picker):
+Install skills with interactive target/skill selection:
 ```bash
-skop add --target codex my-org/coding-skills
-```
-
-Install skills for **Opencode** (preselected in the picker):
-```bash
-skop add --target opencode community-skills/python-tools
-```
-
-Install skills for **all** agents (preselected in the picker):
-```bash
-skop add --target all community-skills/python-tools
+skop add my-org/coding-skills
 ```
 
 ## Marketplace Format

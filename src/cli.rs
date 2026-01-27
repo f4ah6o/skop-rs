@@ -14,10 +14,6 @@ pub struct Cli {
 pub enum Commands {
     /// Add a marketplace and install skills (interactive)
     Add {
-        /// Target environment (codex, opencode, antigravity, all)
-        #[arg(long, value_enum)]
-        target: Target,
-
         /// Show what would be installed without writing files
         #[arg(long)]
         dry_run: bool,

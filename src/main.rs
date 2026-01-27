@@ -42,7 +42,6 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Add {
-            target,
             dry_run,
             verbose: _,
             max_depth,
@@ -54,7 +53,7 @@ fn main() -> Result<()> {
                 quiet: false,
             };
             let marketplace = fetch_marketplace(&repo)?;
-            let targets = select_targets(target)?;
+            let targets = select_targets()?;
             if targets.is_empty() {
                 println!("No targets selected.");
                 return Ok(());
@@ -316,25 +315,25 @@ fn plan_marketplace_skills(
     Ok(SkillPlan { by_plugin, all_skills })
 }
 
-fn select_targets(initial_target: Target) -> Result<Vec<Target>> {
-    let targets = vec![Target::Codex, Target::Opencode, Target::Antigravity];
+fn select_targets() -> Result<Vec<Target>> {
+    let targets = vec![
+        Target::Codex,
+        Target::Opencode,
+        Target::Antigravity,
+        Target::All,
+    ];
     let labels: Vec<String> = targets.iter().map(|t| t.to_string()).collect();
-    let mut preselected = vec![false; labels.len()];
-    match initial_target {
-        Target::All => {
-            preselected.fill(true);
-        }
-        _ => {
-            if let Some(pos) = targets.iter().position(|t| *t == initial_target) {
-                preselected[pos] = true;
-            }
+    let preselected = vec![false; labels.len()];
+    let selected = interactive_select_labels("Select targets", &labels, &preselected)?;
+    if let Some(all_index) = targets.iter().position(|t| *t == Target::All) {
+        if selected.get(all_index).copied().unwrap_or(false) {
+            return Ok(vec![Target::Codex, Target::Opencode, Target::Antigravity]);
         }
     }
-    let selected = interactive_select_labels("Select targets", &labels, &preselected)?;
     let chosen = targets
         .into_iter()
         .zip(selected.into_iter())
-        .filter_map(|(target, is_selected)| if is_selected { Some(target) } else { None })
+        .filter_map(|(target, is_selected)| if is_selected && target != Target::All { Some(target) } else { None })
         .collect();
     Ok(chosen)
 }

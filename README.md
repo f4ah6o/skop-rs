@@ -23,17 +23,14 @@ cargo install --path .
 
 ### Add a Marketplace
 
-To add skills from a marketplace to a specific agent's environment:
+To add skills from a marketplace, Skop now prompts you to select the targets and skills interactively:
 
 ```bash
 skop add --target <TARGET> <OWNER/REPO>
 ```
 
-- **TARGET**: The target agent environment. One of:
-    - `codex`: Installs to `$CWD/.codex/skills`
-    - `opencode`: Installs to `$CWD/.opencode/skills`
-    - `antigravity`: Installs to `$CWD/.agent/skills`
-    - `all`: Installs to all supported agent skill directories
+- **TARGET**: Used as the initial selection in the target picker. One of:
+    - `codex`, `opencode`, `antigravity`, `all`
 - **OWNER/REPO**: The GitHub repository containing the `marketplace.json` file (e.g., `owner/my-marketplace`).
 - **Options**:
     - `--dry-run`: Print what would be installed without writing files.
@@ -60,17 +57,17 @@ skop remove --help
 
 ### Examples
 
-Install skills for **Codex** from a marketplace:
+Install skills for **Codex** (preselected in the picker):
 ```bash
 skop add --target codex my-org/coding-skills
 ```
 
-Install skills for **Opencode**:
+Install skills for **Opencode** (preselected in the picker):
 ```bash
 skop add --target opencode community-skills/python-tools
 ```
 
-Install skills for **all** agents:
+Install skills for **all** agents (preselected in the picker):
 ```bash
 skop add --target all community-skills/python-tools
 ```
@@ -117,6 +114,7 @@ Example `marketplace.json`:
 4. **Install/Update**: If the plugin is new or has a higher version, Skop clones the repository (shallow clone), discovers skill folders (directories containing `SKILL.md`), and copies them into the agent's skill directory. It stores install metadata in `.skop/<plugin>.json`.
     - Skill discovery prefers `skills` or `agents` paths in the plugin entry when provided, otherwise it falls back to the conventional `skills/` layout.
     - Dry-run mode prints detected skills, marketplace presence, and recursion steps without writing files.
+    - Interactive mode lets you choose which targets and skills to install.
 
 ## License
 

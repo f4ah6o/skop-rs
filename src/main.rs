@@ -33,6 +33,7 @@ struct SkillEntry {
 struct InstallOptions {
     dry_run: bool,
     max_depth: usize,
+    quiet: bool,
 }
 
 fn main() -> Result<()> {
@@ -47,27 +48,46 @@ fn main() -> Result<()> {
             max_depth,
             repo,
         } => {
-            let options = InstallOptions { dry_run, max_depth };
-            if target == Target::All {
-                let mut failed = Vec::new();
-                for target in [Target::Codex, Target::Opencode, Target::Antigravity] {
-                    if let Err(err) = handle_add(target, &repo, options) {
-                        eprintln!("Target {} failed: {}", target, err);
-                        failed.push(target);
-                    }
+            let options = InstallOptions {
+                dry_run,
+                max_depth,
+                quiet: false,
+            };
+            let marketplace = fetch_marketplace(&repo)?;
+            let targets = select_targets(target)?;
+            if targets.is_empty() {
+                println!("No targets selected.");
+                return Ok(());
+            }
+            let plan = plan_marketplace_skills(&marketplace, &repo, options)?;
+            let selected_skills = select_skills(&plan)?;
+            if selected_skills.is_empty() {
+                println!("No skills selected.");
+                return Ok(());
+            }
+            let mut failed = Vec::new();
+            for target in targets {
+                if let Err(err) = handle_add(
+                    target,
+                    &repo,
+                    &marketplace,
+                    &plan.by_plugin,
+                    options,
+                    &selected_skills,
+                ) {
+                    eprintln!("Target {} failed: {}", target, err);
+                    failed.push(target);
                 }
-                if !failed.is_empty() {
-                    return Err(anyhow!(
-                        "Failed targets: {}",
-                        failed
-                            .into_iter()
-                            .map(|t| t.to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ));
-                }
-            } else {
-                handle_add(target, &repo, options)?;
+            }
+            if !failed.is_empty() {
+                return Err(anyhow!(
+                    "Failed targets: {}",
+                    failed
+                        .into_iter()
+                        .map(|t| t.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
             }
         }
         Commands::Remove => {
@@ -93,7 +113,14 @@ fn init_logger(cli: &Cli) {
     let _ = env_logger::Builder::from_env(env).try_init();
 }
 
-fn handle_add(target: Target, repo: &str, options: InstallOptions) -> Result<()> {
+fn handle_add(
+    target: Target,
+    repo: &str,
+    marketplace: &Marketplace,
+    skills_by_plugin: &HashMap<String, Vec<String>>,
+    options: InstallOptions,
+    selected_skills: &HashSet<String>,
+) -> Result<()> {
     let skills_dir = util::get_skills_dir(target);
     if options.dry_run {
         println!("Dry run: no files will be modified.");
@@ -103,27 +130,27 @@ fn handle_add(target: Target, repo: &str, options: InstallOptions) -> Result<()>
         fs::create_dir_all(skills_dir.join(".skop")).context("Failed to create metadata dir")?;
     }
 
-    let url = util::get_marketplace_url(repo);
-    info!("Fetching marketplace from {}", url);
-
-    let resp = reqwest::blocking::get(&url)?;
-    if !resp.status().is_success() {
-        return Err(anyhow!(
-            "Failed to fetch marketplace: status {}",
-            resp.status()
-        ));
-    }
-
-    let marketplace: Marketplace = resp.json()?;
-    info!("Found marketplace: {}", marketplace.name);
     let plugin_root = marketplace
         .metadata
         .as_ref()
         .and_then(|metadata| metadata.plugin_root.as_deref());
 
-    for plugin in marketplace.plugins {
+    for plugin in &marketplace.plugins {
+        let selected_for_plugin = skills_by_plugin
+            .get(&plugin.name)
+            .map(|skills| {
+                skills
+                    .iter()
+                    .filter(|skill| selected_skills.contains(*skill))
+                    .cloned()
+                    .collect::<HashSet<_>>()
+            })
+            .unwrap_or_default();
+        if selected_for_plugin.is_empty() {
+            continue;
+        }
         let metadata = read_plugin_metadata(&skills_dir, &plugin.name);
-        let should_install = should_install_plugin(&plugin, metadata.as_ref());
+        let should_install = should_install_plugin(plugin, metadata.as_ref());
 
         if !should_install {
             info!("Plugin {} is up to date.", plugin.name);
@@ -147,8 +174,14 @@ fn handle_add(target: Target, repo: &str, options: InstallOptions) -> Result<()>
             }
         }
 
-        let installed_skills =
-            install_plugin(&plugin, &skills_dir, repo, plugin_root, options)?;
+        let installed_skills = install_plugin(
+            plugin,
+            &skills_dir,
+            repo,
+            plugin_root,
+            options,
+            Some(&selected_for_plugin),
+        )?;
 
         if options.dry_run {
             println!(
@@ -220,6 +253,107 @@ fn handle_remove() -> Result<()> {
 
     println!("Removed {} skill(s).", selected.len());
     Ok(())
+}
+
+fn fetch_marketplace(repo: &str) -> Result<Marketplace> {
+    let url = util::get_marketplace_url(repo);
+    info!("Fetching marketplace from {}", url);
+
+    let resp = reqwest::blocking::get(&url)?;
+    if !resp.status().is_success() {
+        return Err(anyhow!(
+            "Failed to fetch marketplace: status {}",
+            resp.status()
+        ));
+    }
+
+    let marketplace: Marketplace = resp.json()?;
+    info!("Found marketplace: {}", marketplace.name);
+    Ok(marketplace)
+}
+
+struct SkillPlan {
+    by_plugin: HashMap<String, Vec<String>>,
+    all_skills: Vec<String>,
+}
+
+fn plan_marketplace_skills(
+    marketplace: &Marketplace,
+    repo: &str,
+    options: InstallOptions,
+) -> Result<SkillPlan> {
+    let mut by_plugin = HashMap::new();
+    let mut all = HashSet::new();
+    let plugin_root = marketplace
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.plugin_root.as_deref());
+
+    let temp_skills_dir = tempfile::tempdir()?;
+    let plan_options = InstallOptions {
+        dry_run: true,
+        max_depth: options.max_depth,
+        quiet: true,
+    };
+
+    for plugin in &marketplace.plugins {
+        let skills = install_plugin(
+            plugin,
+            temp_skills_dir.path(),
+            repo,
+            plugin_root,
+            plan_options,
+            None,
+        )?;
+        for skill in &skills {
+            all.insert(skill.clone());
+        }
+        by_plugin.insert(plugin.name.clone(), skills);
+    }
+
+    let mut all_skills: Vec<String> = all.into_iter().collect();
+    all_skills.sort();
+    Ok(SkillPlan { by_plugin, all_skills })
+}
+
+fn select_targets(initial_target: Target) -> Result<Vec<Target>> {
+    let targets = vec![Target::Codex, Target::Opencode, Target::Antigravity];
+    let labels: Vec<String> = targets.iter().map(|t| t.to_string()).collect();
+    let mut preselected = vec![false; labels.len()];
+    match initial_target {
+        Target::All => {
+            preselected.fill(true);
+        }
+        _ => {
+            if let Some(pos) = targets.iter().position(|t| *t == initial_target) {
+                preselected[pos] = true;
+            }
+        }
+    }
+    let selected = interactive_select_labels("Select targets", &labels, &preselected)?;
+    let chosen = targets
+        .into_iter()
+        .zip(selected.into_iter())
+        .filter_map(|(target, is_selected)| if is_selected { Some(target) } else { None })
+        .collect();
+    Ok(chosen)
+}
+
+fn select_skills(plan: &SkillPlan) -> Result<HashSet<String>> {
+    if plan.all_skills.is_empty() {
+        return Ok(HashSet::new());
+    }
+    let preselected = vec![true; plan.all_skills.len()];
+    let selected =
+        interactive_select_labels("Select skills to install", &plan.all_skills, &preselected)?;
+    let chosen = plan
+        .all_skills
+        .iter()
+        .cloned()
+        .zip(selected.into_iter())
+        .filter_map(|(skill, is_selected)| if is_selected { Some(skill) } else { None })
+        .collect();
+    Ok(chosen)
 }
 
 fn collect_installed_skills() -> Result<Vec<SkillEntry>> {
@@ -294,6 +428,94 @@ fn interactive_select_skills(entries: &[SkillEntry]) -> Result<Vec<SkillEntry>> 
         .filter_map(|(entry, is_selected)| if is_selected { Some(entry) } else { None })
         .collect();
     Ok(chosen)
+}
+
+fn interactive_select_labels(
+    title: &str,
+    labels: &[String],
+    preselected: &[bool],
+) -> Result<Vec<bool>> {
+    let mut selected = vec![false; labels.len()];
+    for (idx, value) in preselected.iter().copied().enumerate() {
+        if let Some(slot) = selected.get_mut(idx) {
+            *slot = value;
+        }
+    }
+    let mut index = 0usize;
+    let mut stdout = io::stdout();
+    let _guard = RawModeGuard::new(&mut stdout)?;
+
+    loop {
+        render_label_list(&mut stdout, title, labels, &selected, index)?;
+        match event::read()? {
+            event::Event::Key(key) => match key.code {
+                event::KeyCode::Char('q') | event::KeyCode::Esc => {
+                    execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
+                    return Ok(vec![false; labels.len()]);
+                }
+                event::KeyCode::Up => {
+                    if index > 0 {
+                        index -= 1;
+                    }
+                }
+                event::KeyCode::Down => {
+                    if index + 1 < labels.len() {
+                        index += 1;
+                    }
+                }
+                event::KeyCode::Char(' ') => {
+                    if let Some(state) = selected.get_mut(index) {
+                        *state = !*state;
+                    }
+                }
+                event::KeyCode::Enter => break,
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+
+    execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
+    Ok(selected)
+}
+
+fn render_label_list(
+    stdout: &mut io::Stdout,
+    title: &str,
+    labels: &[String],
+    selected: &[bool],
+    index: usize,
+) -> Result<()> {
+    execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
+    let (cols, rows) = terminal::size()?;
+    let width = cols as usize;
+    let max_rows = rows as usize;
+    let header = fit_line(title, width);
+    execute!(stdout, cursor::MoveTo(0, 0))?;
+    writeln!(stdout, "{header}")?;
+
+    let available = max_rows.saturating_sub(1);
+    let start = if index >= available && available > 0 {
+        index + 1 - available
+    } else {
+        0
+    };
+    let end = usize::min(start + available, labels.len());
+    for (row, idx) in (start..end).enumerate() {
+        let label = &labels[idx];
+        let cursor = if idx == index { ">" } else { " " };
+        let mark = if selected.get(idx).copied().unwrap_or(false) {
+            "x"
+        } else {
+            " "
+        };
+        let line = format!("{} [{}] {}", cursor, mark, label);
+        let line = fit_line(&line, width);
+        execute!(stdout, cursor::MoveTo(0, (row + 1) as u16))?;
+        writeln!(stdout, "{line}")?;
+    }
+    stdout.flush()?;
+    Ok(())
 }
 
 fn render_skill_list(
@@ -528,6 +750,7 @@ fn install_plugin(
     marketplace_repo: &str,
     plugin_root: Option<&str>,
     options: InstallOptions,
+    selected_skills: Option<&HashSet<String>>,
 ) -> Result<Vec<String>> {
     let mut visited = HashSet::new();
     install_plugin_recursive(
@@ -538,6 +761,7 @@ fn install_plugin(
         0,
         &mut visited,
         options,
+        selected_skills,
     )
 }
 
@@ -549,6 +773,7 @@ fn install_plugin_recursive(
     depth: usize,
     visited: &mut HashSet<String>,
     options: InstallOptions,
+    selected_skills: Option<&HashSet<String>>,
 ) -> Result<Vec<String>> {
     if depth > options.max_depth {
         return handle_missing_skills(
@@ -577,7 +802,7 @@ fn install_plugin_recursive(
 
     let temp_dir = tempfile::Builder::new().prefix("skop_install").tempdir()?;
     info!("Cloning {} ...", git_url);
-    if options.dry_run {
+    if options.dry_run && !options.quiet {
         let indent = "  ".repeat(depth + 1);
         println!("{indent}repo: {}", git_url);
         if let Some(subpath) = &subpath {
@@ -608,11 +833,19 @@ fn install_plugin_recursive(
     };
 
     if source_path.exists() {
-        let skill_paths = discover_skill_dirs(&source_path, plugin)?;
+        let mut skill_paths = discover_skill_dirs(&source_path, plugin)?;
         if !skill_paths.is_empty() {
+            if let Some(selected) = selected_skills {
+                skill_paths = filter_skill_paths(skill_paths, selected);
+            }
+            if skill_paths.is_empty() {
+                return Ok(Vec::new());
+            }
             if options.dry_run {
-                let indent = "  ".repeat(depth + 1);
-                println!("{indent}skills detected: {}", format_skill_names(&skill_paths));
+                if !options.quiet {
+                    let indent = "  ".repeat(depth + 1);
+                    println!("{indent}skills detected: {}", format_skill_names(&skill_paths));
+                }
                 return Ok(extract_skill_names(skill_paths));
             }
             return install_skills_from_paths(skills_dir, skill_paths);
@@ -620,12 +853,12 @@ fn install_plugin_recursive(
     }
 
     if let Some(marketplace) = read_marketplace_from_repo(&repo_root) {
-        if options.dry_run {
+        if options.dry_run && !options.quiet {
             let indent = "  ".repeat(depth + 1);
             println!("{indent}marketplace.json: found");
         }
         if let Some(nested_plugin) = marketplace.plugins.iter().find(|p| p.name == plugin.name) {
-            if options.dry_run {
+            if options.dry_run && !options.quiet {
                 let indent = "  ".repeat(depth + 1);
                 println!(
                     "{indent}recursive: using marketplace entry for {}",
@@ -645,16 +878,17 @@ fn install_plugin_recursive(
                 depth + 1,
                 visited,
                 options,
+                selected_skills,
             );
         }
-        if options.dry_run {
+        if options.dry_run && !options.quiet {
             let indent = "  ".repeat(depth + 1);
             println!(
                 "{indent}marketplace.json: no matching plugin entry for {}",
                 plugin.name
             );
         }
-    } else if options.dry_run {
+    } else if options.dry_run && !options.quiet {
         let indent = "  ".repeat(depth + 1);
         println!("{indent}marketplace.json: absent");
     }
@@ -677,6 +911,7 @@ fn install_from_marketplace_entry(
     depth: usize,
     visited: &mut HashSet<String>,
     options: InstallOptions,
+    selected_skills: Option<&HashSet<String>>,
 ) -> Result<Vec<String>> {
     match &plugin.source {
         PluginSource::Path(path) => {
@@ -689,7 +924,10 @@ fn install_from_marketplace_entry(
                 );
             }
 
-            let skill_paths = discover_skill_dirs(&source_path, plugin)?;
+            let mut skill_paths = discover_skill_dirs(&source_path, plugin)?;
+            if let Some(selected) = selected_skills {
+                skill_paths = filter_skill_paths(skill_paths, selected);
+            }
             if skill_paths.is_empty() {
                 return handle_missing_skills(
                     options,
@@ -700,15 +938,17 @@ fn install_from_marketplace_entry(
                 );
             }
             if options.dry_run {
-                let indent = "  ".repeat(depth + 1);
-                println!("{indent}marketplace entry: path");
-                println!("{indent}skills detected: {}", format_skill_names(&skill_paths));
+                if !options.quiet {
+                    let indent = "  ".repeat(depth + 1);
+                    println!("{indent}marketplace entry: path");
+                    println!("{indent}skills detected: {}", format_skill_names(&skill_paths));
+                }
                 return Ok(extract_skill_names(skill_paths));
             }
             install_skills_from_paths(skills_dir, skill_paths)
         }
         PluginSource::Object(_) => {
-            if options.dry_run {
+            if options.dry_run && !options.quiet {
                 let indent = "  ".repeat(depth + 1);
                 println!("{indent}recursive: following source object");
             }
@@ -720,6 +960,7 @@ fn install_from_marketplace_entry(
                 depth,
                 visited,
                 options,
+                selected_skills,
             )
         }
     }
@@ -727,7 +968,9 @@ fn install_from_marketplace_entry(
 
 fn handle_missing_skills(options: InstallOptions, message: &str) -> Result<Vec<String>> {
     if options.dry_run {
-        println!("  {}", message);
+        if !options.quiet {
+            println!("  {}", message);
+        }
         return Ok(Vec::new());
     }
     Err(anyhow!(message.to_string()))
@@ -750,6 +993,21 @@ fn extract_skill_names(skill_paths: Vec<PathBuf>) -> Vec<String> {
     skill_paths
         .into_iter()
         .filter_map(|path| path.file_name().and_then(|name| name.to_str()).map(|s| s.to_string()))
+        .collect()
+}
+
+fn filter_skill_paths(
+    skill_paths: Vec<PathBuf>,
+    selected_skills: &HashSet<String>,
+) -> Vec<PathBuf> {
+    skill_paths
+        .into_iter()
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| selected_skills.contains(name))
+                .unwrap_or(false)
+        })
         .collect()
 }
 

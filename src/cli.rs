@@ -12,7 +12,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Add a marketplace and install skills
+    /// Add a marketplace and install skills (interactive)
     Add {
         /// Target environment (codex, opencode, antigravity, all)
         #[arg(long, value_enum)]

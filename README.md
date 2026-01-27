@@ -32,6 +32,20 @@ skop add --target <TARGET> <OWNER/REPO>
     - `opencode`: Installs to `$CWD/.opencode/skills`
     - `antigravity`: Installs to `$CWD/.agent/skills`
 - **OWNER/REPO**: The GitHub repository containing the `marketplace.json` file (e.g., `owner/my-marketplace`).
+- **Options**:
+    - `--dry-run`: Print what would be installed without writing files.
+    - `--verbose`: Enable verbose logging.
+    - `--max-depth <N>`: Maximum recursion depth when resolving nested marketplaces (default: 1).
+
+### Remove Skills (Interactive)
+
+```bash
+skop remove
+```
+
+- Lists installed skills across all supported agent directories as `<skill name> (<agent>)`.
+- Use arrow keys to move, space to toggle selection.
+- Press Enter, then confirm with `y` to remove.
 
 ### Examples
 
@@ -82,8 +96,10 @@ Example `marketplace.json`:
     - If the source is a relative path (e.g., `./skills/foo`), it defaults to cloning the marketplace repository itself.
     - **Override**: If a plugin entry has a `repository` field, it will use that URL as the base for relative path sources.
     - If the source is an explicit object (GitHub/URL), it uses that definition.
-3. **Check**: It compares the `version` in `marketplace.json` with the installed `plugin.json` (if present).
-4. **Install/Update**: If the plugin is new or has a higher version, Skop clones the repository (shallow clone) and copies the relevant files to the agent's skill directory.
+    - If `metadata.pluginRoot` is set in the marketplace, relative paths (without `./`) are resolved against it.
+3. **Check**: It compares the `version` in `marketplace.json` with the locally stored metadata.
+4. **Install/Update**: If the plugin is new or has a higher version, Skop clones the repository (shallow clone), discovers skill folders (directories containing `SKILL.md`), and copies them into the agent's skill directory. It stores install metadata in `.skop/<plugin>.json`.
+    - Skill discovery prefers `skills` or `agents` paths in the plugin entry when provided, otherwise it falls back to the conventional `skills/` layout.
 
 ## License
 

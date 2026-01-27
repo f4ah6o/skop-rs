@@ -18,9 +18,23 @@ pub enum Commands {
         #[arg(long, value_enum)]
         target: Target,
 
+        /// Show what would be installed without writing files
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Enable verbose logging
+        #[arg(long)]
+        verbose: bool,
+
+        /// Maximum recursion depth when resolving nested marketplaces
+        #[arg(long, default_value_t = 1)]
+        max_depth: usize,
+
         /// Repository owner/name (e.g. owner/repo)
         repo: String,
     },
+    /// Remove installed skills interactively
+    Remove,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]

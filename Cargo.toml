@@ -1,6 +1,6 @@
 [package]
 name = "skop"
-version = "0.1.0"
+version = "2026.1.0"
 edition = "2024"
 
 [dependencies]
@@ -18,3 +18,4 @@ directories = "6.0"
 regex = "1.10"
 log = "0.4"
 env_logger = "0.11"
+crossterm = "0.28"

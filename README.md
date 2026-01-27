@@ -16,7 +16,7 @@ Skop is a CLI tool designed to manage skills for various AI coding agents, inclu
 Ensure you have Rust and Cargo installed.
 
 ```bash
-cargo install --path .
+cargo install skop
 ```
 
 ## Usage

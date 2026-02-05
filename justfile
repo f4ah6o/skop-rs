@@ -6,6 +6,6 @@ release-check:
     cargo publish --dry-run
 
 release: release-check
-    version=$(rg -n "^version = " Cargo.toml | head -n1 | sed -E 's/.*\"([^\"]+)\".*/\\1/'); \
+    version=$(rg -n "^version = " Cargo.toml | head -n1 | awk -F'\"' '{print $2}'); \
     git tag "v${version}"; \
     git push origin "v${version}"

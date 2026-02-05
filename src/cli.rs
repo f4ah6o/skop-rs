@@ -12,7 +12,10 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Add a marketplace and install skills (interactive)
+    /// Add a marketplace and install skills (interactive or single-skill non-interactive)
+    #[command(
+        long_about = "Add a marketplace and install skills.\n\nInteractive:\n  skop add <OWNER/REPO>\n\nNon-interactive single skill:\n  skop add <SKILL>@<OWNER/REPO> --target <codex|opencode|antigravity|all>\n\nNotes:\n  --target is required when using <SKILL>@<OWNER/REPO>.\n  --target can be used with <OWNER/REPO> to skip the target selection UI."
+    )]
     Add {
         /// Show what would be installed without writing files
         #[arg(long)]
@@ -26,7 +29,11 @@ pub enum Commands {
         #[arg(long, default_value_t = 1)]
         max_depth: usize,
 
-        /// Repository owner/name (e.g. owner/repo)
+        /// Non-interactive target (codex, opencode, antigravity, all) when using <skill>@<owner>/<repo>
+        #[arg(long)]
+        target: Option<Target>,
+
+        /// Repository owner/name (e.g. owner/repo) or <skill>@<owner>/<repo>
         repo: String,
     },
     /// Remove installed skills interactively

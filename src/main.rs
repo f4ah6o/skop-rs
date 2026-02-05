@@ -46,6 +46,12 @@ struct CloneCache {
     entries: HashMap<CacheKey, tempfile::TempDir>,
 }
 
+#[derive(Debug)]
+struct AddSpec {
+    repo: String,
+    skill: Option<String>,
+}
+
 impl CloneCache {
     fn new() -> Self {
         Self {
@@ -91,6 +97,26 @@ impl CloneCache {
         Ok(path)
     }
 }
+
+fn parse_add_spec(input: &str) -> Result<AddSpec> {
+    if let Some((skill, repo)) = input.split_once('@') {
+        let skill = skill.trim();
+        let repo = repo.trim();
+        if skill.is_empty() || repo.is_empty() {
+            return Err(anyhow!(
+                "Invalid add syntax. Use <owner>/<repo> or <skill>@<owner>/<repo>."
+            ));
+        }
+        return Ok(AddSpec {
+            repo: repo.to_string(),
+            skill: Some(skill.to_string()),
+        });
+    }
+    Ok(AddSpec {
+        repo: input.trim().to_string(),
+        skill: None,
+    })
+}
 fn main() -> Result<()> {
     let cli = Cli::parse();
     init_logger(&cli);
@@ -100,6 +126,7 @@ fn main() -> Result<()> {
             dry_run,
             verbose: _,
             max_depth,
+            target,
             repo,
         } => {
             let options = InstallOptions {
@@ -107,25 +134,63 @@ fn main() -> Result<()> {
                 max_depth,
                 quiet: false,
             };
-            let marketplace = fetch_marketplace(&repo)?;
+            let add_spec = parse_add_spec(&repo)?;
+            let marketplace = fetch_marketplace(&add_spec.repo)?;
             let mut clone_cache = CloneCache::new();
             print_progress("Scanning marketplace to build skill list...")?;
-            let plan = plan_marketplace_skills(&marketplace, &repo, options, &mut clone_cache)?;
-            let selected_skills = select_skills(&plan)?;
-            if selected_skills.is_empty() {
-                println!("No skills selected.");
-                return Ok(());
-            }
-            let targets = select_targets()?;
-            if targets.is_empty() {
-                println!("No targets selected.");
-                return Ok(());
-            }
+            let plan = plan_marketplace_skills(&marketplace, &add_spec.repo, options, &mut clone_cache)?;
+
+            let has_single_skill = add_spec.skill.is_some();
+            let selected_skills = match add_spec.skill.as_ref() {
+                Some(skill) => {
+                    if !plan.all_skills.iter().any(|value| value == skill) {
+                        let available = if plan.all_skills.is_empty() {
+                            "none".to_string()
+                        } else {
+                            plan.all_skills.join(", ")
+                        };
+                        return Err(anyhow!(
+                            "Skill '{}' not found in marketplace. Available: {}",
+                            skill,
+                            available
+                        ));
+                    }
+                    let mut set = HashSet::new();
+                    set.insert(skill.to_string());
+                    set
+                }
+                None => {
+                    let selected = select_skills(&plan)?;
+                    if selected.is_empty() {
+                        println!("No skills selected.");
+                        return Ok(());
+                    }
+                    selected
+                }
+            };
+
+            let targets = match target {
+                Some(value) => expand_targets(value),
+                None => {
+                    if has_single_skill {
+                        return Err(anyhow!(
+                            "--target is required when using <skill>@<owner>/<repo>"
+                        ));
+                    }
+                    let selected = select_targets()?;
+                    if selected.is_empty() {
+                        println!("No targets selected.");
+                        return Ok(());
+                    }
+                    selected
+                }
+            };
+
             let mut failed = Vec::new();
             for target in targets {
                 if let Err(err) = handle_add(
                     target,
-                    &repo,
+                    &add_spec.repo,
                     &marketplace,
                     &plan.by_plugin,
                     options,
@@ -419,6 +484,13 @@ fn select_targets() -> Result<Vec<Target>> {
         .filter_map(|(target, is_selected)| if is_selected && target != Target::All { Some(target) } else { None })
         .collect();
     Ok(chosen)
+}
+
+fn expand_targets(target: Target) -> Vec<Target> {
+    match target {
+        Target::All => vec![Target::Codex, Target::Opencode, Target::Antigravity],
+        _ => vec![target],
+    }
 }
 
 fn select_skills(plan: &SkillPlan) -> Result<HashSet<String>> {
@@ -1636,5 +1708,19 @@ mod tests {
 
         assert_eq!(skills.len(), 1);
         assert_eq!(skills[0].file_name().unwrap(), "moonbit-agent-guide");
+    }
+
+    #[test]
+    fn test_parse_add_spec_plain_repo() {
+        let spec = parse_add_spec("owner/repo").unwrap();
+        assert_eq!(spec.repo, "owner/repo");
+        assert!(spec.skill.is_none());
+    }
+
+    #[test]
+    fn test_parse_add_spec_skill_repo() {
+        let spec = parse_add_spec("my-skill@owner/repo").unwrap();
+        assert_eq!(spec.repo, "owner/repo");
+        assert_eq!(spec.skill.as_deref(), Some("my-skill"));
     }
 }

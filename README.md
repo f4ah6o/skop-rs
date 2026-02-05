@@ -35,6 +35,12 @@ skop add <OWNER/REPO>
     - `--verbose`: Enable verbose logging.
     - `--max-depth <N>`: Maximum recursion depth when resolving nested marketplaces (default: 1).
 
+For non-interactive installs of a single skill:
+
+```bash
+skop add <SKILL>@<OWNER/REPO> --target <codex|opencode|antigravity|all>
+```
+
 ### Remove Skills (Interactive)
 
 ```bash
@@ -61,6 +67,19 @@ skop --help
 skop add --help
 skop remove --help
 skop list --help
+```
+
+Quick reference:
+
+```bash
+# Interactive marketplace install
+skop add <OWNER/REPO>
+
+# Non-interactive single skill install
+skop add <SKILL>@<OWNER/REPO> --target <codex|opencode|antigravity|all>
+
+# Skip target UI while keeping interactive skill selection
+skop add <OWNER/REPO> --target <codex|opencode|antigravity|all>
 ```
 
 ### Examples

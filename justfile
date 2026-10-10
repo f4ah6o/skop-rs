@@ -6,6 +6,5 @@ release-check:
     cargo publish --dry-run
 
 release: release-check
-    version=$(node -p "require('./package.json').version"); \
-    git tag "v${version}"; \
-    git push origin "v${version}"
+    git tag -f latest HEAD
+    git push -f origin latest

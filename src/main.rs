@@ -2,7 +2,7 @@ mod cli;
 mod model;
 mod util;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 use cli::{Cli, Commands, Target};
 use crossterm::{cursor, event, execute, terminal};
@@ -138,7 +138,8 @@ fn main() -> Result<()> {
             let marketplace = fetch_marketplace(&add_spec.repo)?;
             let mut clone_cache = CloneCache::new();
             print_progress("Scanning marketplace to build skill list...")?;
-            let plan = plan_marketplace_skills(&marketplace, &add_spec.repo, options, &mut clone_cache)?;
+            let plan =
+                plan_marketplace_skills(&marketplace, &add_spec.repo, options, &mut clone_cache)?;
 
             let has_single_skill = add_spec.skill.is_some();
             let selected_skills = match add_spec.skill.as_ref() {
@@ -455,7 +456,10 @@ fn plan_marketplace_skills(
 
     let mut all_skills: Vec<String> = all.into_iter().collect();
     all_skills.sort();
-    Ok(SkillPlan { by_plugin, all_skills })
+    Ok(SkillPlan {
+        by_plugin,
+        all_skills,
+    })
 }
 
 fn select_targets() -> Result<Vec<Target>> {
@@ -473,15 +477,21 @@ fn select_targets() -> Result<Vec<Target>> {
         &preselected,
         true,
     )?;
-    if let Some(all_index) = targets.iter().position(|t| *t == Target::All) {
-        if selected.get(all_index).copied().unwrap_or(false) {
-            return Ok(vec![Target::Codex, Target::Opencode, Target::Antigravity]);
-        }
+    if let Some(all_index) = targets.iter().position(|t| *t == Target::All)
+        && selected.get(all_index).copied().unwrap_or(false)
+    {
+        return Ok(vec![Target::Codex, Target::Opencode, Target::Antigravity]);
     }
     let chosen = targets
         .into_iter()
-        .zip(selected.into_iter())
-        .filter_map(|(target, is_selected)| if is_selected && target != Target::All { Some(target) } else { None })
+        .zip(selected)
+        .filter_map(|(target, is_selected)| {
+            if is_selected && target != Target::All {
+                Some(target)
+            } else {
+                None
+            }
+        })
         .collect();
     Ok(chosen)
 }
@@ -508,7 +518,7 @@ fn select_skills(plan: &SkillPlan) -> Result<HashSet<String>> {
         .all_skills
         .iter()
         .cloned()
-        .zip(selected.into_iter())
+        .zip(selected)
         .filter_map(|(skill, is_selected)| if is_selected { Some(skill) } else { None })
         .collect();
     Ok(chosen)
@@ -525,7 +535,9 @@ fn collect_installed_skills() -> Result<Vec<SkillEntry>> {
             let entry = entry?;
             let path = entry.path();
             let name = entry.file_name();
-            let Some(name_str) = name.to_str() else { continue };
+            let Some(name_str) = name.to_str() else {
+                continue;
+            };
             if name_str == ".skop" {
                 continue;
             }
@@ -551,16 +563,14 @@ fn interactive_select_skills(entries: &[SkillEntry]) -> Result<Vec<SkillEntry>> 
 
     loop {
         render_skill_list(&mut stdout, entries, &selected, index, status.as_deref())?;
-        match event::read()? {
-            event::Event::Key(key) => match key.code {
+        if let event::Event::Key(key) = event::read()? {
+            match key.code {
                 event::KeyCode::Char('q') | event::KeyCode::Esc => {
                     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
                     return Ok(Vec::new());
                 }
                 event::KeyCode::Up => {
-                    if index > 0 {
-                        index -= 1;
-                    }
+                    index = index.saturating_sub(1);
                     status = None;
                 }
                 event::KeyCode::Down => {
@@ -572,9 +582,7 @@ fn interactive_select_skills(entries: &[SkillEntry]) -> Result<Vec<SkillEntry>> 
                 event::KeyCode::Char(' ') => {
                     if index == 0 {
                         let new_state = !selected[0];
-                        for state in &mut selected {
-                            *state = new_state;
-                        }
+                        selected.fill(new_state);
                     } else if let Some(state) = selected.get_mut(index) {
                         *state = !*state;
                         selected[0] = selected.iter().skip(1).all(|value| *value);
@@ -589,8 +597,7 @@ fn interactive_select_skills(entries: &[SkillEntry]) -> Result<Vec<SkillEntry>> 
                     break;
                 }
                 _ => {}
-            },
-            _ => {}
+            }
         }
     }
 
@@ -622,17 +629,22 @@ fn interactive_select_labels(
     let mut status: Option<String> = None;
 
     loop {
-        render_label_list(&mut stdout, title, labels, &selected, index, status.as_deref())?;
-        match event::read()? {
-            event::Event::Key(key) => match key.code {
+        render_label_list(
+            &mut stdout,
+            title,
+            labels,
+            &selected,
+            index,
+            status.as_deref(),
+        )?;
+        if let event::Event::Key(key) = event::read()? {
+            match key.code {
                 event::KeyCode::Char('q') | event::KeyCode::Esc => {
                     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
                     return Ok(vec![false; labels.len()]);
                 }
                 event::KeyCode::Up => {
-                    if index > 0 {
-                        index -= 1;
-                    }
+                    index = index.saturating_sub(1);
                     status = None;
                 }
                 event::KeyCode::Down => {
@@ -655,8 +667,7 @@ fn interactive_select_labels(
                     break;
                 }
                 _ => {}
-            },
-            _ => {}
+            }
         }
     }
 
@@ -914,7 +925,9 @@ fn write_plugin_metadata(
 }
 
 fn plugin_metadata_path(skills_dir: &Path, plugin_name: &str) -> PathBuf {
-    skills_dir.join(".skop").join(format!("{}.json", plugin_name))
+    skills_dir
+        .join(".skop")
+        .join(format!("{}.json", plugin_name))
 }
 
 fn cleanup_metadata(skills_dir: &Path, removed_skills: &HashSet<String>) -> Result<()> {
@@ -968,10 +981,11 @@ fn cleanup_empty_skill_dirs(skills_dir: &Path) -> Result<()> {
 
     if is_dir_empty(skills_dir)? {
         fs::remove_dir(skills_dir)?;
-        if let Some(parent) = skills_dir.parent() {
-            if parent.exists() && is_dir_empty(parent)? {
-                fs::remove_dir(parent)?;
-            }
+        if let Some(parent) = skills_dir.parent()
+            && parent.exists()
+            && is_dir_empty(parent)?
+        {
+            fs::remove_dir(parent)?;
         }
     }
 
@@ -991,7 +1005,10 @@ fn remove_installed_skills(
         let skill_dir = skills_dir.join(skill);
         if skill_dir.exists() {
             fs::remove_dir_all(&skill_dir).with_context(|| {
-                format!("Failed to remove existing skill {} for {}", skill, plugin_name)
+                format!(
+                    "Failed to remove existing skill {} for {}",
+                    skill, plugin_name
+                )
             })?;
         }
     }
@@ -1025,6 +1042,7 @@ fn install_plugin(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn install_plugin_recursive(
     plugin: &model::PluginEntry,
     skills_dir: &Path,
@@ -1087,7 +1105,10 @@ fn install_plugin_recursive(
             if options.dry_run {
                 if !options.quiet {
                     let indent = "  ".repeat(depth + 1);
-                    println!("{indent}skills detected: {}", format_skill_names(&skill_paths));
+                    println!(
+                        "{indent}skills detected: {}",
+                        format_skill_names(&skill_paths)
+                    );
                 }
                 return Ok(extract_skill_names(skill_paths));
             }
@@ -1146,6 +1167,7 @@ fn install_plugin_recursive(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn install_from_marketplace_entry(
     plugin: &model::PluginEntry,
     skills_dir: &Path,
@@ -1186,7 +1208,10 @@ fn install_from_marketplace_entry(
                 if !options.quiet {
                     let indent = "  ".repeat(depth + 1);
                     println!("{indent}marketplace entry: path");
-                    println!("{indent}skills detected: {}", format_skill_names(&skill_paths));
+                    println!(
+                        "{indent}skills detected: {}",
+                        format_skill_names(&skill_paths)
+                    );
                 }
                 return Ok(extract_skill_names(skill_paths));
             }
@@ -1238,7 +1263,11 @@ fn format_skill_names(skill_paths: &[PathBuf]) -> String {
 fn extract_skill_names(skill_paths: Vec<PathBuf>) -> Vec<String> {
     skill_paths
         .into_iter()
-        .filter_map(|path| path.file_name().and_then(|name| name.to_str()).map(|s| s.to_string()))
+        .filter_map(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|s| s.to_string())
+        })
         .collect()
 }
 
@@ -1301,13 +1330,13 @@ fn resolve_plugin_url(
 ) -> (String, Option<String>, Option<String>) {
     let base_repo_url = resolve_marketplace_repo_url(marketplace_repo);
     let get_override_url = |plugin: &model::PluginEntry| -> Option<String> {
-        if let Some(author) = &plugin.author {
-            if let Some(url) = &author.url {
-                if url.starts_with("http") || url.starts_with("git@") {
-                    return Some(url.clone());
-                } else {
-                    return Some(format!("https://github.com/{}.git", url));
-                }
+        if let Some(author) = &plugin.author
+            && let Some(url) = &author.url
+        {
+            if url.starts_with("http") || url.starts_with("git@") {
+                return Some(url.clone());
+            } else {
+                return Some(format!("https://github.com/{}.git", url));
             }
         }
         if let Some(repo) = &plugin.repository {
@@ -1328,19 +1357,15 @@ fn resolve_plugin_url(
             (repo_url, Some(resolved_path), None)
         }
         PluginSource::Object(def) => match def {
-            SourceDefinition::Github {
-                repo,
-                ref_,
-                sha: _,
-            } => {
+            SourceDefinition::Github { repo, ref_, sha: _ } => {
                 // For explicit Github source, use the defined repo, ignoring overrides
-                (format!("https://github.com/{}.git", repo), None, ref_.clone())
+                (
+                    format!("https://github.com/{}.git", repo),
+                    None,
+                    ref_.clone(),
+                )
             }
-            SourceDefinition::Url {
-                url,
-                ref_,
-                sha: _,
-            } => {
+            SourceDefinition::Url { url, ref_, sha: _ } => {
                 // For explicit URL source, use the defined URL, ignoring overrides
                 (url.clone(), None, ref_.clone())
             }
@@ -1365,20 +1390,14 @@ fn apply_plugin_root(path: &str, plugin_root: Option<&str>) -> String {
         return path.to_string();
     }
 
-    Path::new(root)
-        .join(path)
-        .to_string_lossy()
-        .to_string()
+    Path::new(root).join(path).to_string_lossy().to_string()
 }
 
 fn is_explicit_path(path: &str) -> bool {
     path.starts_with("./") || path.starts_with("../") || path.starts_with('/')
 }
 
-fn discover_skill_dirs(
-    plugin_root: &Path,
-    plugin: &model::PluginEntry,
-) -> Result<Vec<PathBuf>> {
+fn discover_skill_dirs(plugin_root: &Path, plugin: &model::PluginEntry) -> Result<Vec<PathBuf>> {
     let mut skill_paths = Vec::new();
     if let Some(paths) = extract_skill_paths(plugin) {
         skill_paths.extend(collect_skills_from_candidates(plugin_root, &paths)?);
@@ -1465,14 +1484,10 @@ fn collect_skills_from_candidates(
     for candidate in candidates {
         let candidate_path = plugin_root.join(candidate);
         if candidate_path.is_file() {
-            if candidate_path
-                .file_name()
-                .and_then(|name| name.to_str())
-                == Some("SKILL.md")
+            if candidate_path.file_name().and_then(|name| name.to_str()) == Some("SKILL.md")
+                && let Some(parent) = candidate_path.parent()
             {
-                if let Some(parent) = candidate_path.parent() {
-                    skill_paths.push(parent.to_path_buf());
-                }
+                skill_paths.push(parent.to_path_buf());
             }
             continue;
         }
@@ -1493,14 +1508,10 @@ fn collect_skills_from_candidates(
                 if path.join("SKILL.md").is_file() {
                     skill_paths.push(path);
                 }
-            } else if path
-                .file_name()
-                .and_then(|name| name.to_str())
-                == Some("SKILL.md")
+            } else if path.file_name().and_then(|name| name.to_str()) == Some("SKILL.md")
+                && let Some(parent) = path.parent()
             {
-                if let Some(parent) = path.parent() {
-                    skill_paths.push(parent.to_path_buf());
-                }
+                skill_paths.push(parent.to_path_buf());
             }
         }
     }
@@ -1571,8 +1582,7 @@ mod tests {
     fn test_resolve_path_applies_plugin_root() {
         let source = PluginSource::Path("formatter".to_string());
         let plugin = create_dummy_plugin(source, None, None);
-        let (url, subpath, _) =
-            resolve_plugin_url(&plugin, "owner/marketplace", Some("./plugins"));
+        let (url, subpath, _) = resolve_plugin_url(&plugin, "owner/marketplace", Some("./plugins"));
 
         assert_eq!(url, "https://github.com/owner/marketplace.git");
         assert_eq!(subpath, Some("./plugins/formatter".to_string()));
@@ -1591,11 +1601,8 @@ mod tests {
     fn test_resolve_path_with_marketplace_url() {
         let source = PluginSource::Path("./skills/test".to_string());
         let plugin = create_dummy_plugin(source, None, None);
-        let (url, subpath, _) = resolve_plugin_url(
-            &plugin,
-            "https://github.com/example/repo.git",
-            None,
-        );
+        let (url, subpath, _) =
+            resolve_plugin_url(&plugin, "https://github.com/example/repo.git", None);
 
         assert_eq!(url, "https://github.com/example/repo.git");
         assert_eq!(subpath, Some("./skills/test".to_string()));
@@ -1675,7 +1682,9 @@ mod tests {
         fs::write(skill_dir.join("SKILL.md"), "skill").unwrap();
 
         let mut plugin = create_dummy_plugin(PluginSource::Path(".".to_string()), None, None);
-        plugin.extra.insert("skills".to_string(), json!("custom-skill"));
+        plugin
+            .extra
+            .insert("skills".to_string(), json!("custom-skill"));
 
         let skills = discover_skill_dirs(root, &plugin).unwrap();
         assert_eq!(skills.len(), 1);

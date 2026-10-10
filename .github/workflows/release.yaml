@@ -1,0 +1,19 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - latest
+
+jobs:
+  release:
+    permissions:
+      actions: write
+      contents: write
+      id-token: write
+    uses: f4ah6o/calver-action/.github/workflows/rust-dist.yaml@dfd57cf474631b778e41478cbb183b34bd487545
+    with:
+      format: YYYY.MM.PATCH
+      timezone: Asia/Tokyo
+      tag_prefix: v
+      registry_publish: true
